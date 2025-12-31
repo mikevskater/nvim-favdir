@@ -52,6 +52,7 @@ end
 ---@return FavdirData
 local function create_default_data()
   local groups = {}
+  -- Only create groups if configured
   if config and config.default_groups then
     for i, name in ipairs(config.default_groups) do
       table.insert(groups, {
@@ -62,13 +63,6 @@ local function create_default_data()
       })
     end
   end
-  -- Always add Uncategorized
-  table.insert(groups, {
-    name = "Uncategorized",
-    items = {},
-    order = #groups + 1,
-    children = {},
-  })
   return { groups = groups }
 end
 

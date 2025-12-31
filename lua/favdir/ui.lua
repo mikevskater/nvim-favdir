@@ -10,6 +10,100 @@ local state_module = require("favdir.state")
 local panel_state = nil
 
 -- ============================================================================
+-- Input Popups using nvim-float (with vim.ui fallbacks)
+-- ============================================================================
+
+---Show a text input popup using nvim-float Form or fallback to vim.ui.input
+---@param title string Title of the popup
+---@param label string Label for the input field
+---@param default_value string? Default value
+---@param on_submit fun(value: string) Callback with the entered value
+---@param on_cancel fun()? Optional cancel callback
+local function show_input_popup(title, label, default_value, on_submit, on_cancel)
+  local nvim_float = require("nvim-float")
+
+  -- Try nvim-float form if available
+  if nvim_float.create_form then
+    nvim_float.create_form({
+      title = " " .. title .. " ",
+      width = 50,
+      zindex = nvim_float.ZINDEX and nvim_float.ZINDEX.MODAL or 150,
+      fields = {
+        {
+          name = "value",
+          label = label,
+          type = "text",
+          value = default_value or "",
+          placeholder = "Enter value...",
+          width = 30,
+        },
+      },
+      on_submit = function(values)
+        if values.value and values.value ~= "" then
+          on_submit(values.value)
+        end
+      end,
+      on_cancel = on_cancel,
+    })
+  else
+    -- Fallback to vim.ui.input
+    vim.ui.input({
+      prompt = label .. " ",
+      default = default_value or "",
+    }, function(value)
+      if value and value ~= "" then
+        on_submit(value)
+      elseif on_cancel then
+        on_cancel()
+      end
+    end)
+  end
+end
+
+---Show a selection popup using nvim-float or fallback to vim.ui.select
+---@param title string Title of the popup
+---@param items string[] Items to select from
+---@param on_select fun(index: number, item: string) Callback with selected item
+local function show_select_popup(title, items, on_select)
+  local nvim_float = require("nvim-float")
+
+  -- Try nvim-float select if available
+  if nvim_float.select then
+    nvim_float.select(items, on_select, title)
+  else
+    -- Fallback to vim.ui.select
+    vim.ui.select(items, { prompt = title }, function(item, idx)
+      if item then
+        on_select(idx, item)
+      end
+    end)
+  end
+end
+
+---Show a confirmation popup using nvim-float or fallback to vim.ui.select
+---@param message string|string[] Message to display
+---@param on_confirm fun() Callback on confirmation
+---@param on_cancel fun()? Optional cancel callback
+local function show_confirm_popup(message, on_confirm, on_cancel)
+  local nvim_float = require("nvim-float")
+
+  -- Try nvim-float confirm if available
+  if nvim_float.confirm then
+    nvim_float.confirm(message, on_confirm, on_cancel)
+  else
+    -- Fallback to vim.ui.select
+    local msg = type(message) == "table" and table.concat(message, " ") or message
+    vim.ui.select({ "Yes", "No" }, { prompt = msg }, function(choice)
+      if choice == "Yes" then
+        on_confirm()
+      elseif on_cancel then
+        on_cancel()
+      end
+    end)
+  end
+end
+
+-- ============================================================================
 -- Icons - Unified icon definitions with Nerd Font, ASCII, and colors
 -- ============================================================================
 
@@ -390,7 +484,8 @@ end
 ---@return table[] highlights
 local function render_right_panel(mp_state)
   local ui_state = state_module.load_ui_state()
-  local data = mp_state.data and mp_state.data.main_data or state_module.load_data()
+  -- Always load fresh data to ensure we see newly added items
+  local data = state_module.load_data()
 
   local ContentBuilder = require("nvim-float.content_builder")
   local cb = ContentBuilder.new()
@@ -494,6 +589,30 @@ end
 -- Keymap Handlers
 -- ============================================================================
 
+---Handle toggle expand/collapse
+---@param mp_state MultiPanelState
+local function handle_toggle_expand(mp_state)
+  local focused = mp_state.focused_panel
+
+  if focused ~= "groups" then
+    return
+  end
+
+  local row = mp_state:get_cursor("groups")
+  local nodes = mp_state.data and mp_state.data.tree_nodes or {}
+  local node = get_node_at_line(nodes, row)
+
+  if not node then return end
+
+  if node.has_children then
+    -- Toggle expansion
+    state_module.toggle_expanded(node.full_path)
+    mp_state:render_panel("groups")
+  else
+    vim.notify("No child groups to expand", vim.log.levels.INFO)
+  end
+end
+
 ---Handle Enter key
 ---@param mp_state MultiPanelState
 local function handle_enter(mp_state)
@@ -501,15 +620,15 @@ local function handle_enter(mp_state)
   local ui_state = state_module.load_ui_state()
 
   if focused == "groups" then
-    -- Left panel: toggle expand or select group
+    -- Left panel: select group (and toggle if has children)
     local row = mp_state:get_cursor("groups")
     local nodes = mp_state.data and mp_state.data.tree_nodes or {}
     local node = get_node_at_line(nodes, row)
 
     if not node then return end
 
+    -- If has children, toggle expansion
     if node.has_children then
-      -- Toggle expansion
       state_module.toggle_expanded(node.full_path)
     end
 
@@ -557,23 +676,23 @@ local function handle_add(mp_state)
     local title = parent_path ~= "" and ("Add Child to " .. parent_path) or "Add New Group"
 
     show_input_popup(title, "Group Name:", "", function(name)
-        local ok, err = state_module.add_group(parent_path, name)
-        if ok then
-          -- Expand parent to show new child
-          if parent_path ~= "" then
-            local ui_state = state_module.load_ui_state()
-            if not state_module.is_expanded(ui_state, parent_path) then
-              state_module.toggle_expanded(parent_path)
-            end
+      local ok, err = state_module.add_group(parent_path, name)
+      if ok then
+        -- Expand parent to show new child
+        if parent_path ~= "" then
+          local ui_state = state_module.load_ui_state()
+          if not state_module.is_expanded(ui_state, parent_path) then
+            state_module.toggle_expanded(parent_path)
           end
-          -- Schedule render to ensure it happens after callback completes
-          vim.schedule(function()
-            if mp_state and mp_state:is_valid() then
-          mp_state:render_panel("groups")
-            end
-          end)
-        else
-          vim.notify(err or "Failed to add group", vim.log.levels.ERROR)
+        end
+        -- Schedule render to ensure it happens after callback completes
+        vim.schedule(function()
+          if mp_state and mp_state:is_valid() then
+            mp_state:render_panel("groups")
+          end
+        end)
+      else
+        vim.notify(err or "Failed to add group", vim.log.levels.ERROR)
       end
     end)
   else
@@ -588,44 +707,44 @@ local function handle_add(mp_state)
 
     -- Use nvim-float select popup
     show_select_popup("Add to " .. group_path, { "Current directory", "Current file", "Enter path..." }, function(idx, choice)
-        if not choice then return end
+      if not choice then return end
 
-        local path
-        if choice == "Current directory" then
-          path = vim.fn.getcwd()
-        elseif choice == "Current file" then
-          path = vim.fn.expand('%:p')
-          if path == "" then
-            vim.notify("No file in current buffer", vim.log.levels.WARN)
-            return
-          end
-        else
+      local path
+      if choice == "Current directory" then
+        path = vim.fn.getcwd()
+      elseif choice == "Current file" then
+        path = vim.fn.expand('%:p')
+        if path == "" then
+          vim.notify("No file in current buffer", vim.log.levels.WARN)
+          return
+        end
+      else
         -- Show input popup for custom path
         show_input_popup("Add Path", "Path:", "", function(input)
-              local ok, err = state_module.add_item(group_path, input)
-              if ok then
+          local ok, err = state_module.add_item(group_path, input)
+          if ok then
             vim.schedule(function()
               if mp_state and mp_state:is_valid() then
                 mp_state:render_panel("items")
               end
             end)
-              else
-                vim.notify(err or "Failed to add item", vim.log.levels.ERROR)
-            end
-          end)
-          return
-        end
-
-        local ok, err = state_module.add_item(group_path, path)
-        if ok then
-        vim.schedule(function()
-          if mp_state and mp_state:is_valid() then
-          mp_state:render_panel("items")
+          else
+            vim.notify(err or "Failed to add item", vim.log.levels.ERROR)
           end
         end)
-        else
-          vim.notify(err or "Failed to add item", vim.log.levels.ERROR)
-        end
+        return
+      end
+
+      local ok, err = state_module.add_item(group_path, path)
+      if ok then
+        vim.schedule(function()
+          if mp_state and mp_state:is_valid() then
+            mp_state:render_panel("items")
+          end
+        end)
+      else
+        vim.notify(err or "Failed to add item", vim.log.levels.ERROR)
+      end
     end)
   end
 end
@@ -642,21 +761,17 @@ local function handle_delete(mp_state)
 
     if not node then return end
 
-    vim.ui.select({ "Yes", "No" }, {
-      prompt = "Delete group '" .. node.name .. "'?",
-    }, function(choice)
-      if choice == "Yes" then
-        local ok, err = state_module.remove_group(node.full_path)
-        if ok then
-          vim.schedule(function()
-            if mp_state and mp_state:is_valid() then
-          mp_state:render_panel("groups")
-          mp_state:render_panel("items")
-            end
-          end)
-        else
-          vim.notify(err or "Failed to delete group", vim.log.levels.ERROR)
-        end
+    show_confirm_popup("Delete group '" .. node.name .. "'?", function()
+      local ok, err = state_module.remove_group(node.full_path)
+      if ok then
+        vim.schedule(function()
+          if mp_state and mp_state:is_valid() then
+            mp_state:render_panel("groups")
+            mp_state:render_panel("items")
+          end
+        end)
+      else
+        vim.notify(err or "Failed to delete group", vim.log.levels.ERROR)
       end
     end)
   else
@@ -672,20 +787,16 @@ local function handle_delete(mp_state)
     local item = items[row]
     local name = vim.fn.fnamemodify(item.path, ':t')
 
-    vim.ui.select({ "Yes", "No" }, {
-      prompt = "Remove '" .. name .. "' from group?",
-    }, function(choice)
-      if choice == "Yes" then
-        local ok, err = state_module.remove_item(group_path, row)
-        if ok then
-          vim.schedule(function()
-            if mp_state and mp_state:is_valid() then
-          mp_state:render_panel("items")
-            end
-          end)
-        else
-          vim.notify(err or "Failed to remove item", vim.log.levels.ERROR)
-        end
+    show_confirm_popup("Remove '" .. name .. "' from group?", function()
+      local ok, err = state_module.remove_item(group_path, row)
+      if ok then
+        vim.schedule(function()
+          if mp_state and mp_state:is_valid() then
+            mp_state:render_panel("items")
+          end
+        end)
+      else
+        vim.notify(err or "Failed to remove item", vim.log.levels.ERROR)
       end
     end)
   end
@@ -703,16 +814,13 @@ local function handle_rename(mp_state)
 
     if not node then return end
 
-    vim.ui.input({
-      prompt = "New name: ",
-      default = node.name,
-    }, function(new_name)
-      if new_name and new_name ~= "" and new_name ~= node.name then
+    show_input_popup("Rename Group", "New Name:", node.name, function(new_name)
+      if new_name ~= node.name then
         local ok, err = state_module.rename_group(node.full_path, new_name)
         if ok then
           vim.schedule(function()
             if mp_state and mp_state:is_valid() then
-          mp_state:render_panel("groups")
+              mp_state:render_panel("groups")
             end
           end)
         else
@@ -755,14 +863,14 @@ local function handle_move(mp_state)
     return
   end
 
-  vim.ui.select(groups, { prompt = "Move to group:" }, function(to_group)
+  show_select_popup("Move to group", groups, function(idx, to_group)
     if to_group then
       local ok, err = state_module.move_item(from_group, row, to_group)
       if ok then
         vim.notify("Moved to " .. to_group, vim.log.levels.INFO)
         vim.schedule(function()
           if mp_state and mp_state:is_valid() then
-        mp_state:render_panel("items")
+            mp_state:render_panel("items")
           end
         end)
       else
@@ -998,7 +1106,8 @@ function M.show(config)
       {
         header = "Navigation",
         keys = {
-      { key = "<CR>", desc = "Select/Toggle" },
+          { key = "<CR>", desc = "Select group / Open item" },
+          { key = "o", desc = "Expand/Collapse group" },
           { key = "<Tab>/<S-Tab>", desc = "Switch panel" },
           { key = "j/k", desc = "Move cursor" },
         },
@@ -1006,9 +1115,9 @@ function M.show(config)
       {
         header = "Actions",
         keys = {
-      { key = "a", desc = "Add group/item" },
-      { key = "d", desc = "Delete" },
-      { key = "r", desc = "Rename group" },
+          { key = "a", desc = "Add group/item" },
+          { key = "d", desc = "Delete" },
+          { key = "r", desc = "Rename group" },
           { key = "m", desc = "Move item to group" },
         },
       },
@@ -1022,15 +1131,15 @@ function M.show(config)
       {
         header = "Open Options",
         keys = {
-      { key = "<C-s>", desc = "Open in split" },
-      { key = "<C-v>", desc = "Open in vsplit" },
-      { key = "<C-t>", desc = "Open in tab" },
+          { key = "<C-s>", desc = "Open in split" },
+          { key = "<C-v>", desc = "Open in vsplit" },
+          { key = "<C-t>", desc = "Open in tab" },
         },
       },
       {
         header = "Window",
         keys = {
-      { key = "q/<Esc>", desc = "Close" },
+          { key = "q/<Esc>", desc = "Close" },
         },
       },
     },
@@ -1059,6 +1168,7 @@ function M.show(config)
   -- Setup keymaps
   panel_state:set_keymaps({
     ["<CR>"] = function() handle_enter(panel_state) end,
+    ["o"] = function() handle_toggle_expand(panel_state) end,
     ["<Tab>"] = function() panel_state:focus_next_panel() end,
     ["<S-Tab>"] = function() panel_state:focus_prev_panel() end,
     ["a"] = function() handle_add(panel_state) end,
