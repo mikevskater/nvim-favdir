@@ -5,11 +5,12 @@
 
 local M = {}
 
-M.version = "0.5.0"
+M.version = "0.6.0"
 
 -- Lazy-loaded modules
 local _state = nil
 local _ui = nil
+local _initialized = false
 
 ---Get the state module (lazy-loaded)
 ---@return FavdirState
@@ -88,16 +89,17 @@ M.config = {
   window_width_ratio = 0.8,
   left_panel_width_ratio = 0.35,
   confirm_deletions = true,
-  default_groups = { "Work", "Personal", "Projects" },
-  protected_groups = { "Uncategorized" },
+  default_groups = {},  -- No default groups, user manages all
+  protected_groups = {},  -- No protected groups
   use_nerd_font = nil, -- nil = auto-detect
 }
 
----Setup the plugin with user configuration
----@param opts FavdirConfig? User configuration options
-function M.setup(opts)
-  opts = opts or {}
-  M.config = vim.tbl_deep_extend("force", M.config, opts)
+---Ensure the plugin is initialized (called automatically on first use)
+---@return boolean success
+local function ensure_initialized()
+  if _initialized then
+    return true
+  end
 
   -- Auto-detect Nerd Font if not explicitly set
   if M.config.use_nerd_font == nil then
@@ -108,7 +110,7 @@ function M.setup(opts)
   local ok, nf = pcall(require, "nvim-float")
   if not ok then
     vim.notify("nvim-favdir: nvim-float is required but not installed", vim.log.levels.ERROR)
-    return
+    return false
   end
 
   -- Setup nvim-float if not already done
@@ -116,21 +118,40 @@ function M.setup(opts)
 
   -- Initialize state module with config
   get_state().init(M.config)
+
+  _initialized = true
+  return true
+end
+
+---Setup the plugin with user configuration
+---@param opts FavdirConfig? User configuration options
+function M.setup(opts)
+  opts = opts or {}
+  M.config = vim.tbl_deep_extend("force", M.config, opts)
+
+  -- Reset initialized flag to re-apply config
+  _initialized = false
+
+  -- Initialize with new config
+  ensure_initialized()
 end
 
 ---Show the favorites UI
 function M.show_ui()
+  if not ensure_initialized() then return end
   get_ui().show(M.config)
 end
 
 ---Toggle the favorites UI (show if hidden, hide if shown)
 function M.toggle_ui()
+  if not ensure_initialized() then return end
   get_ui().toggle(M.config)
 end
 
 ---Add the current working directory to favorites
 ---@param group_path string? Optional group path (prompts if not provided)
 function M.add_current_dir(group_path)
+  if not ensure_initialized() then return end
   local cwd = vim.fn.getcwd()
   if group_path then
     get_state().add_item(group_path, cwd)
@@ -143,6 +164,7 @@ end
 ---Add the current buffer's file to favorites
 ---@param group_path string? Optional group path (prompts if not provided)
 function M.add_current_file(group_path)
+  if not ensure_initialized() then return end
   local file = vim.fn.expand('%:p')
   if file == "" then
     vim.notify("No file in current buffer", vim.log.levels.WARN)
@@ -159,12 +181,14 @@ end
 ---Get all data (for external access)
 ---@return FavdirData
 function M.get_data()
+  if not ensure_initialized() then return { groups = {} } end
   return get_state().load_data()
 end
 
 ---Get all groups as flat list (for completion, etc.)
 ---@return string[] List of group paths
 function M.get_group_list()
+  if not ensure_initialized() then return {} end
   return get_state().get_group_list()
 end
 

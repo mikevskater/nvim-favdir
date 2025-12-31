@@ -554,9 +554,9 @@ local function handle_add(mp_state)
     local node = get_node_at_line(nodes, row)
 
     local parent_path = node and node.full_path or ""
+    local title = parent_path ~= "" and ("Add Child to " .. parent_path) or "Add New Group"
 
-    vim.ui.input({ prompt = "New group name: " }, function(name)
-      if name and name ~= "" then
+    show_input_popup(title, "Group Name:", "", function(name)
         local ok, err = state_module.add_group(parent_path, name)
         if ok then
           -- Expand parent to show new child
@@ -566,10 +566,14 @@ local function handle_add(mp_state)
               state_module.toggle_expanded(parent_path)
             end
           end
+          -- Schedule render to ensure it happens after callback completes
+          vim.schedule(function()
+            if mp_state and mp_state:is_valid() then
           mp_state:render_panel("groups")
+            end
+          end)
         else
           vim.notify(err or "Failed to add group", vim.log.levels.ERROR)
-        end
       end
     end)
   else
@@ -582,10 +586,8 @@ local function handle_add(mp_state)
       return
     end
 
-    vim.ui.select(
-      { "Current directory", "Current file", "Enter path..." },
-      { prompt = "Add to " .. group_path .. ":" },
-      function(choice)
+    -- Use nvim-float select popup
+    show_select_popup("Add to " .. group_path, { "Current directory", "Current file", "Enter path..." }, function(idx, choice)
         if not choice then return end
 
         local path
@@ -598,14 +600,17 @@ local function handle_add(mp_state)
             return
           end
         else
-          vim.ui.input({ prompt = "Path: ", completion = "file" }, function(input)
-            if input and input ~= "" then
+        -- Show input popup for custom path
+        show_input_popup("Add Path", "Path:", "", function(input)
               local ok, err = state_module.add_item(group_path, input)
               if ok then
+            vim.schedule(function()
+              if mp_state and mp_state:is_valid() then
                 mp_state:render_panel("items")
+              end
+            end)
               else
                 vim.notify(err or "Failed to add item", vim.log.levels.ERROR)
-              end
             end
           end)
           return
@@ -613,12 +618,15 @@ local function handle_add(mp_state)
 
         local ok, err = state_module.add_item(group_path, path)
         if ok then
+        vim.schedule(function()
+          if mp_state and mp_state:is_valid() then
           mp_state:render_panel("items")
+          end
+        end)
         else
           vim.notify(err or "Failed to add item", vim.log.levels.ERROR)
         end
-      end
-    )
+    end)
   end
 end
 
@@ -640,8 +648,12 @@ local function handle_delete(mp_state)
       if choice == "Yes" then
         local ok, err = state_module.remove_group(node.full_path)
         if ok then
+          vim.schedule(function()
+            if mp_state and mp_state:is_valid() then
           mp_state:render_panel("groups")
           mp_state:render_panel("items")
+            end
+          end)
         else
           vim.notify(err or "Failed to delete group", vim.log.levels.ERROR)
         end
@@ -666,7 +678,11 @@ local function handle_delete(mp_state)
       if choice == "Yes" then
         local ok, err = state_module.remove_item(group_path, row)
         if ok then
+          vim.schedule(function()
+            if mp_state and mp_state:is_valid() then
           mp_state:render_panel("items")
+            end
+          end)
         else
           vim.notify(err or "Failed to remove item", vim.log.levels.ERROR)
         end
@@ -694,7 +710,11 @@ local function handle_rename(mp_state)
       if new_name and new_name ~= "" and new_name ~= node.name then
         local ok, err = state_module.rename_group(node.full_path, new_name)
         if ok then
+          vim.schedule(function()
+            if mp_state and mp_state:is_valid() then
           mp_state:render_panel("groups")
+            end
+          end)
         else
           vim.notify(err or "Failed to rename group", vim.log.levels.ERROR)
         end
@@ -740,7 +760,11 @@ local function handle_move(mp_state)
       local ok, err = state_module.move_item(from_group, row, to_group)
       if ok then
         vim.notify("Moved to " .. to_group, vim.log.levels.INFO)
+        vim.schedule(function()
+          if mp_state and mp_state:is_valid() then
         mp_state:render_panel("items")
+          end
+        end)
       else
         vim.notify(err or "Failed to move item", vim.log.levels.ERROR)
       end
@@ -968,21 +992,47 @@ function M.show(config)
     },
     total_width_ratio = config.window_width_ratio,
     total_height_ratio = config.window_height_ratio,
-    footer = "? = Help",
+    footer = "? = Controls",
     initial_focus = "groups",
     controls = {
+      {
+        header = "Navigation",
+        keys = {
       { key = "<CR>", desc = "Select/Toggle" },
-      { key = "<Tab>", desc = "Switch panel" },
+          { key = "<Tab>/<S-Tab>", desc = "Switch panel" },
+          { key = "j/k", desc = "Move cursor" },
+        },
+      },
+      {
+        header = "Actions",
+        keys = {
       { key = "a", desc = "Add group/item" },
       { key = "d", desc = "Delete" },
       { key = "r", desc = "Rename group" },
-      { key = "m", desc = "Move item" },
-      { key = "s", desc = "Cycle sort" },
-      { key = "<C-k>/<C-j>", desc = "Reorder" },
+          { key = "m", desc = "Move item to group" },
+        },
+      },
+      {
+        header = "Sorting",
+        keys = {
+          { key = "s", desc = "Cycle sort mode" },
+          { key = "<C-k>/<C-j>", desc = "Reorder up/down" },
+        },
+      },
+      {
+        header = "Open Options",
+        keys = {
       { key = "<C-s>", desc = "Open in split" },
       { key = "<C-v>", desc = "Open in vsplit" },
       { key = "<C-t>", desc = "Open in tab" },
+        },
+      },
+      {
+        header = "Window",
+        keys = {
       { key = "q/<Esc>", desc = "Close" },
+        },
+      },
     },
     on_close = function()
       panel_state = nil
