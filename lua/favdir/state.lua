@@ -381,6 +381,98 @@ function M.rename_group(group_path, new_name)
   return true, nil
 end
 
+---Move a group to a new parent
+---@param group_path string Group path to move
+---@param new_parent_path string New parent path (empty string for root level)
+---@return boolean success
+---@return string? error_message
+function M.move_group(group_path, new_parent_path)
+  if not group_path or group_path == "" then
+    return false, "No group specified"
+  end
+
+  local data = M.load_data()
+  local group, source_list = M.find_group(data, group_path)
+
+  if not group or not source_list then
+    return false, "Group not found"
+  end
+
+  -- Check if protected
+  if config and vim.tbl_contains(config.protected_groups, group.name) then
+    return false, "Cannot move protected group"
+  end
+
+  -- Find target parent list
+  local target_list
+  if new_parent_path == "" then
+    target_list = data.groups
+  else
+    local parent_group = M.find_group(data, new_parent_path)
+    if not parent_group then
+      return false, "Target parent not found"
+    end
+    -- Ensure children array exists
+    parent_group.children = parent_group.children or {}
+    target_list = parent_group.children
+  end
+
+  -- Prevent circular reference: can't move a group into itself or its children
+  if new_parent_path ~= "" and (new_parent_path == group_path or vim.startswith(new_parent_path, group_path .. ".")) then
+    return false, "Cannot move group into itself or its children"
+  end
+
+  -- Check for duplicate name at target level
+  for _, g in ipairs(target_list) do
+    if g.name == group.name then
+      return false, "A group with this name already exists at target location"
+    end
+  end
+
+  -- Remove from source list
+  for i, g in ipairs(source_list) do
+    if g == group then
+      table.remove(source_list, i)
+      break
+    end
+  end
+
+  -- Add to target list with new order
+  group.order = #target_list + 1
+  table.insert(target_list, group)
+
+  -- Update UI state expanded_groups paths
+  local ui_state = M.load_ui_state()
+  local new_expanded = {}
+  local new_path = new_parent_path == "" and group.name or (new_parent_path .. "." .. group.name)
+
+  for _, path in ipairs(ui_state.expanded_groups) do
+    if path == group_path then
+      -- Update this exact path
+      table.insert(new_expanded, new_path)
+    elseif vim.startswith(path, group_path .. ".") then
+      -- Update child paths
+      local suffix = path:sub(#group_path + 2)
+      table.insert(new_expanded, new_path .. "." .. suffix)
+    else
+      table.insert(new_expanded, path)
+    end
+  end
+  ui_state.expanded_groups = new_expanded
+
+  -- Update last_selected_group if it was the moved group or a child
+  if ui_state.last_selected_group == group_path then
+    ui_state.last_selected_group = new_path
+  elseif ui_state.last_selected_group and vim.startswith(ui_state.last_selected_group, group_path .. ".") then
+    local suffix = ui_state.last_selected_group:sub(#group_path + 2)
+    ui_state.last_selected_group = new_path .. "." .. suffix
+  end
+
+  M.save_ui_state(ui_state)
+  M.save_data(data)
+  return true, nil
+end
+
 ---Get flat list of all group paths
 ---@return string[]
 function M.get_group_list()

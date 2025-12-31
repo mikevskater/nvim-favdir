@@ -880,6 +880,80 @@ local function handle_move(mp_state)
   end)
 end
 
+---Handle Move Group key (move group to different parent)
+---@param mp_state MultiPanelState
+local function handle_move_group(mp_state)
+  local focused = mp_state.focused_panel
+
+  if focused ~= "groups" then
+    vim.notify("Use 'm' to move items", vim.log.levels.INFO)
+    return
+  end
+
+  local row = mp_state:get_cursor("groups")
+  local nodes = mp_state.data and mp_state.data.tree_nodes or {}
+  local node = get_node_at_line(nodes, row)
+
+  if not node then return end
+
+  local group_path = node.full_path
+
+  -- Build list of possible destinations
+  local all_groups = state_module.get_group_list()
+
+  -- Filter out:
+  -- 1. The group itself
+  -- 2. Any children of the group (would create circular reference)
+  -- 3. The current parent (no point moving to same location)
+  local current_parent = ""
+  local parts = vim.split(group_path, ".", { plain = true })
+  if #parts > 1 then
+    table.remove(parts)
+    current_parent = table.concat(parts, ".")
+  end
+
+  local destinations = {}
+
+  -- Add root level option (unless already at root)
+  if current_parent ~= "" then
+    table.insert(destinations, "(Root Level)")
+  end
+
+  -- Add valid group destinations
+  for _, g in ipairs(all_groups) do
+    -- Skip self, children of self, and current parent
+    if g ~= group_path
+        and not vim.startswith(g, group_path .. ".")
+        and g ~= current_parent then
+      table.insert(destinations, g)
+    end
+  end
+
+  if #destinations == 0 then
+    vim.notify("No valid destinations to move to", vim.log.levels.WARN)
+    return
+  end
+
+  show_select_popup("Move '" .. node.name .. "' to", destinations, function(idx, dest)
+    if dest then
+      local new_parent = dest == "(Root Level)" and "" or dest
+      local ok, err = state_module.move_group(group_path, new_parent)
+      if ok then
+        local dest_name = dest == "(Root Level)" and "root level" or dest
+        vim.notify("Moved '" .. node.name .. "' to " .. dest_name, vim.log.levels.INFO)
+        vim.schedule(function()
+          if mp_state and mp_state:is_valid() then
+            mp_state:render_panel("groups")
+            mp_state:render_panel("items")
+          end
+        end)
+      else
+        vim.notify(err or "Failed to move group", vim.log.levels.ERROR)
+      end
+    end
+  end)
+end
+
 ---Handle Sort key
 ---@param mp_state MultiPanelState
 local function handle_sort(mp_state)
@@ -1119,6 +1193,7 @@ function M.show(config)
           { key = "d", desc = "Delete" },
           { key = "r", desc = "Rename group" },
           { key = "m", desc = "Move item to group" },
+          { key = "M", desc = "Move group to parent" },
         },
       },
       {
@@ -1175,6 +1250,7 @@ function M.show(config)
     ["d"] = function() handle_delete(panel_state) end,
     ["r"] = function() handle_rename(panel_state) end,
     ["m"] = function() handle_move(panel_state) end,
+    ["M"] = function() handle_move_group(panel_state) end,
     ["s"] = function() handle_sort(panel_state) end,
     ["<C-k>"] = function() handle_move_up(panel_state) end,
     ["<C-j>"] = function() handle_move_down(panel_state) end,
