@@ -10,7 +10,7 @@ local state_module = require("favdir.state")
 local panel_state = nil
 
 -- ============================================================================
--- Icons (using nerd font icons with Unicode codepoints)
+-- Icons - Unified icon definitions with Nerd Font, ASCII, and colors
 -- ============================================================================
 
 -- Helper to convert codepoint to UTF-8 character
@@ -18,155 +18,245 @@ local function nf(codepoint)
   return vim.fn.nr2char(codepoint)
 end
 
-local icons = {
-  expanded = "▼",
-  collapsed = "▶",
-  leaf = " ",
-  directory = nf(0xF07B),  -- nf-fa-folder
-  file = nf(0xF15B),       -- nf-fa-file
-  file_default = nf(0xF15B),  -- nf-fa-file
+-- Whether to use Nerd Font icons (set by select_icon_set)
+local use_nerd_font = true
+
+---@class IconDef
+---@field nerd string Nerd Font icon
+---@field ascii string ASCII fallback
+---@field color string? Hex color for the icon
+
+---@class BaseIconDef
+---@field nerd string Nerd Font icon
+---@field ascii string ASCII fallback
+
+-- Base UI icons (expand/collapse, directory, file)
+---@type table<string, BaseIconDef>
+local base_icons = {
+  expanded   = { nerd = "▼",           ascii = "[-]" },
+  collapsed  = { nerd = "▶",           ascii = "[+]" },
+  leaf       = { nerd = "•",           ascii = " - " },  -- Bullet for leaf nodes
+  directory  = { nerd = nf(0xF07B),    ascii = "[D]" },  -- nf-fa-folder
+  file       = { nerd = nf(0xF15B),    ascii = "[F]" },  -- nf-fa-file
 }
 
--- File extension to icon mapping (common types)
--- Codepoints from nvim-web-devicons / Nerd Fonts
+-- File extension icons with colors (from nvim-web-devicons)
+---@type table<string, IconDef>
 local file_icons = {
   -- Lua
-  lua = nf(0xE620),        -- nf-seti-lua
+  lua      = { nerd = nf(0xE620), ascii = "lua", color = "#51A0CF" },
 
   -- Python
-  py = nf(0xE73C),         -- nf-dev-python
-  python = nf(0xE73C),
+  py       = { nerd = nf(0xE73C), ascii = "py",  color = "#FFDC51" },
+  python   = { nerd = nf(0xE73C), ascii = "py",  color = "#FFDC51" },
+  pyw      = { nerd = nf(0xE73C), ascii = "py",  color = "#FFDC51" },
+  pyx      = { nerd = nf(0xE73C), ascii = "py",  color = "#FFDC51" },
 
   -- JavaScript/TypeScript
-  js = nf(0xE74E),         -- nf-dev-javascript
-  mjs = nf(0xE74E),
-  cjs = nf(0xE74E),
-  ts = nf(0xE628),         -- nf-seti-typescript
-  mts = nf(0xE628),
-  jsx = nf(0xE7BA),        -- nf-dev-react
-  tsx = nf(0xE7BA),
+  js       = { nerd = nf(0xE74E), ascii = "js",  color = "#F1E05A" },
+  mjs      = { nerd = nf(0xE74E), ascii = "js",  color = "#F1E05A" },
+  cjs      = { nerd = nf(0xE74E), ascii = "js",  color = "#F1E05A" },
+  ts       = { nerd = nf(0xE628), ascii = "ts",  color = "#3178C6" },
+  mts      = { nerd = nf(0xE628), ascii = "ts",  color = "#3178C6" },
+  tsx      = { nerd = nf(0xE7BA), ascii = "tsx", color = "#20C2E3" },
+  jsx      = { nerd = nf(0xE7BA), ascii = "jsx", color = "#20C2E3" },
 
   -- Web
-  json = nf(0xE60B),       -- nf-seti-json
-  html = nf(0xE736),       -- nf-dev-html5
-  htm = nf(0xE736),
-  css = nf(0xE749),        -- nf-dev-css3
-  scss = nf(0xE749),
-  sass = nf(0xE749),
-  less = nf(0xE749),
+  json     = { nerd = nf(0xE60B), ascii = "{}", color = "#CBCB41" },
+  jsonc    = { nerd = nf(0xE60B), ascii = "{}", color = "#CBCB41" },
+  html     = { nerd = nf(0xE736), ascii = "<>", color = "#E44D26" },
+  htm      = { nerd = nf(0xE736), ascii = "<>", color = "#E44D26" },
+  css      = { nerd = nf(0xE749), ascii = "#",  color = "#563D7C" },
+  scss     = { nerd = nf(0xE749), ascii = "#",  color = "#CF649A" },
+  sass     = { nerd = nf(0xE749), ascii = "#",  color = "#CF649A" },
+  less     = { nerd = nf(0xE749), ascii = "#",  color = "#1D365D" },
+  vue      = { nerd = nf(0xE6A0), ascii = "vue", color = "#42B883" },
+  svelte   = { nerd = nf(0xE697), ascii = "sve", color = "#FF3E00" },
 
   -- Markdown/Docs
-  md = nf(0xE609),         -- nf-seti-markdown
-  markdown = nf(0xE609),
-  mdx = nf(0xE609),
-  txt = nf(0xF15C),        -- nf-fa-file_text
+  md       = { nerd = nf(0xE609), ascii = "md",  color = "#DDDDDD" },
+  markdown = { nerd = nf(0xE609), ascii = "md",  color = "#DDDDDD" },
+  mdx      = { nerd = nf(0xE609), ascii = "mdx", color = "#DDDDDD" },
+  txt      = { nerd = nf(0xF15C), ascii = "txt", color = "#89E051" },
+  rst      = { nerd = nf(0xF15C), ascii = "rst", color = "#89E051" },
 
   -- Config/Data
-  yaml = nf(0xE6A8),       -- nf-seti-yaml
-  yml = nf(0xE6A8),
-  toml = nf(0xE615),       -- nf-seti-config
-  xml = nf(0xE619),        -- nf-seti-xml
-  ini = nf(0xE615),
-  conf = nf(0xE615),
-  config = nf(0xE615),
+  yaml     = { nerd = nf(0xE6A8), ascii = "yml", color = "#CB171E" },
+  yml      = { nerd = nf(0xE6A8), ascii = "yml", color = "#CB171E" },
+  toml     = { nerd = nf(0xE615), ascii = "cfg", color = "#9C4121" },
+  xml      = { nerd = nf(0xE619), ascii = "xml", color = "#E37933" },
+  ini      = { nerd = nf(0xE615), ascii = "ini", color = "#6D8086" },
+  conf     = { nerd = nf(0xE615), ascii = "cfg", color = "#6D8086" },
+  config   = { nerd = nf(0xE615), ascii = "cfg", color = "#6D8086" },
+  env      = { nerd = nf(0xF462), ascii = "env", color = "#ECD53F" },
 
   -- Shell
-  sh = nf(0xF489),         -- nf-oct-terminal
-  bash = nf(0xF489),
-  zsh = nf(0xF489),
-  fish = nf(0xF489),
-  ps1 = nf(0xF489),
-  bat = nf(0xF489),
-  cmd = nf(0xF489),
+  sh       = { nerd = nf(0xF489), ascii = "$",   color = "#4EAA25" },
+  bash     = { nerd = nf(0xF489), ascii = "$",   color = "#4EAA25" },
+  zsh      = { nerd = nf(0xF489), ascii = "$",   color = "#4EAA25" },
+  fish     = { nerd = nf(0xF489), ascii = "$",   color = "#4EAA25" },
+  ps1      = { nerd = nf(0xF489), ascii = ">_",  color = "#012456" },
+  bat      = { nerd = nf(0xF489), ascii = ">_",  color = "#C1F12E" },
+  cmd      = { nerd = nf(0xF489), ascii = ">_",  color = "#C1F12E" },
 
-  -- Systems languages
-  c = nf(0xE61E),          -- nf-custom-c
-  h = nf(0xE61E),
-  cpp = nf(0xE61D),        -- nf-custom-cpp
-  cc = nf(0xE61D),
-  cxx = nf(0xE61D),
-  hpp = nf(0xE61D),
-  hxx = nf(0xE61D),
-  rs = nf(0xE7A8),         -- nf-dev-rust
-  go = nf(0xE626),         -- nf-seti-go
+  -- C/C++
+  c        = { nerd = nf(0xE61E), ascii = "C",   color = "#599EFF" },
+  h        = { nerd = nf(0xE61E), ascii = "H",   color = "#A074C4" },
+  cpp      = { nerd = nf(0xE61D), ascii = "C+",  color = "#F34B7D" },
+  cc       = { nerd = nf(0xE61D), ascii = "C+",  color = "#F34B7D" },
+  cxx      = { nerd = nf(0xE61D), ascii = "C+",  color = "#F34B7D" },
+  hpp      = { nerd = nf(0xE61D), ascii = "H+",  color = "#A074C4" },
+  hxx      = { nerd = nf(0xE61D), ascii = "H+",  color = "#A074C4" },
+
+  -- Rust/Go
+  rs       = { nerd = nf(0xE7A8), ascii = "rs",  color = "#DEA584" },
+  go       = { nerd = nf(0xE626), ascii = "go",  color = "#00ADD8" },
+  mod      = { nerd = nf(0xE626), ascii = "mod", color = "#00ADD8" },
+  sum      = { nerd = nf(0xE626), ascii = "sum", color = "#00ADD8" },
 
   -- JVM
-  java = nf(0xE738),       -- nf-dev-java
-  kt = nf(0xE634),         -- nf-seti-kotlin
-  kts = nf(0xE634),
-  scala = nf(0xE737),      -- nf-dev-scala
-  groovy = nf(0xE775),     -- nf-dev-groovy
+  java     = { nerd = nf(0xE738), ascii = "jav", color = "#CC3E44" },
+  jar      = { nerd = nf(0xE738), ascii = "jar", color = "#CC3E44" },
+  kt       = { nerd = nf(0xE634), ascii = "kt",  color = "#7F52FF" },
+  kts      = { nerd = nf(0xE634), ascii = "kts", color = "#7F52FF" },
+  scala    = { nerd = nf(0xE737), ascii = "sca", color = "#CC3E44" },
+  groovy   = { nerd = nf(0xE775), ascii = "gvy", color = "#4298B8" },
+  gradle   = { nerd = nf(0xE660), ascii = "grd", color = "#02303A" },
 
   -- Ruby/PHP
-  rb = nf(0xE739),         -- nf-dev-ruby
-  ruby = nf(0xE739),
-  php = nf(0xE73D),        -- nf-dev-php
+  rb       = { nerd = nf(0xE739), ascii = "rb",  color = "#CC342D" },
+  ruby     = { nerd = nf(0xE739), ascii = "rb",  color = "#CC342D" },
+  erb      = { nerd = nf(0xE739), ascii = "erb", color = "#CC342D" },
+  php      = { nerd = nf(0xE73D), ascii = "php", color = "#777BB3" },
 
   -- .NET
-  cs = nf(0xF81A),         -- nf-md-language_csharp
-  fs = nf(0xE7A7),         -- nf-dev-fsharp
-  vb = nf(0xF81A),
+  cs       = { nerd = nf(0xF81A), ascii = "C#",  color = "#68217A" },
+  fs       = { nerd = nf(0xE7A7), ascii = "F#",  color = "#378BBA" },
+  vb       = { nerd = nf(0xF81A), ascii = "vb",  color = "#945DB7" },
+  sln      = { nerd = nf(0xE70C), ascii = "sln", color = "#854CC7" },
 
   -- Database
-  sql = nf(0xE706),        -- nf-dev-database
+  sql      = { nerd = nf(0xE706), ascii = "sql", color = "#67c1f5" },
+  db       = { nerd = nf(0xE706), ascii = "db",  color = "#e0ffb6" },
+  sqlite   = { nerd = nf(0xE706), ascii = "sql", color = "#0F80CC" },
 
   -- Vim/Editor
-  vim = nf(0xE62B),        -- nf-seti-vim
-  nvim = nf(0xE62B),
+  vim      = { nerd = nf(0xE62B), ascii = "vim", color = "#019833" },
+  nvim     = { nerd = nf(0xE62B), ascii = "vim", color = "#019833" },
 
   -- Git
-  git = nf(0xE702),        -- nf-dev-git
-  gitignore = nf(0xE702),
-  gitattributes = nf(0xE702),
-  gitmodules = nf(0xE702),
+  git           = { nerd = nf(0xE702), ascii = "git", color = "#F14C28" },
+  gitignore     = { nerd = nf(0xE702), ascii = "git", color = "#F14C28" },
+  gitattributes = { nerd = nf(0xE702), ascii = "git", color = "#F14C28" },
+  gitmodules    = { nerd = nf(0xE702), ascii = "git", color = "#F14C28" },
 
   -- Docker
-  dockerfile = nf(0xE7B0), -- nf-dev-docker
-  docker = nf(0xE7B0),
+  dockerfile    = { nerd = nf(0xE7B0), ascii = "doc", color = "#2496ED" },
+  docker        = { nerd = nf(0xE7B0), ascii = "doc", color = "#2496ED" },
+  dockerignore  = { nerd = nf(0xE7B0), ascii = "doc", color = "#2496ED" },
 
-  -- Build
-  makefile = nf(0xE779),   -- nf-dev-gnu
-  cmake = nf(0xE615),
-  rake = nf(0xE739),
+  -- Build/Config files
+  makefile = { nerd = nf(0xE779), ascii = "mk",  color = "#6D8086" },
+  cmake    = { nerd = nf(0xE615), ascii = "cmk", color = "#6D8086" },
+  rake     = { nerd = nf(0xE739), ascii = "rak", color = "#CC342D" },
+  just     = { nerd = nf(0xE615), ascii = "jst", color = "#6D8086" },
 
   -- Images
-  png = nf(0xF1C5),        -- nf-fa-file_image
-  jpg = nf(0xF1C5),
-  jpeg = nf(0xF1C5),
-  gif = nf(0xF1C5),
-  svg = nf(0xF1C5),
-  ico = nf(0xF1C5),
-  webp = nf(0xF1C5),
+  png      = { nerd = nf(0xF1C5), ascii = "img", color = "#A074C4" },
+  jpg      = { nerd = nf(0xF1C5), ascii = "img", color = "#A074C4" },
+  jpeg     = { nerd = nf(0xF1C5), ascii = "img", color = "#A074C4" },
+  gif      = { nerd = nf(0xF1C5), ascii = "gif", color = "#A074C4" },
+  svg      = { nerd = nf(0xF1C5), ascii = "svg", color = "#FFB13B" },
+  ico      = { nerd = nf(0xF1C5), ascii = "ico", color = "#CBCB41" },
+  webp     = { nerd = nf(0xF1C5), ascii = "img", color = "#A074C4" },
+  bmp      = { nerd = nf(0xF1C5), ascii = "bmp", color = "#A074C4" },
 
   -- Archives
-  zip = nf(0xF1C6),        -- nf-fa-file_archive
-  tar = nf(0xF1C6),
-  gz = nf(0xF1C6),
-  rar = nf(0xF1C6),
-  ["7z"] = nf(0xF1C6),
+  zip      = { nerd = nf(0xF1C6), ascii = "zip", color = "#ECA517" },
+  tar      = { nerd = nf(0xF1C6), ascii = "tar", color = "#ECA517" },
+  gz       = { nerd = nf(0xF1C6), ascii = "gz",  color = "#ECA517" },
+  rar      = { nerd = nf(0xF1C6), ascii = "rar", color = "#ECA517" },
+  ["7z"]   = { nerd = nf(0xF1C6), ascii = "7z",  color = "#ECA517" },
 
   -- Lock files
-  lock = nf(0xF023),       -- nf-fa-lock
+  lock     = { nerd = nf(0xF023), ascii = "lck", color = "#BBBBBB" },
+
+  -- Misc
+  log      = { nerd = nf(0xF18D), ascii = "log", color = "#DDDDDD" },
+  pdf      = { nerd = nf(0xF1C1), ascii = "pdf", color = "#B30B00" },
+  license  = { nerd = nf(0xF0219), ascii = "lic", color = "#CBCB41" },
 }
 
----Get icon for a file extension
+-- Default colors for base icons
+local base_colors = {
+  directory = "#E8AB53",  -- Folder yellow
+  file = "#6D8086",       -- Default file gray
+}
+
+---Get a base icon (expanded, collapsed, directory, file)
+---@param icon_name string
+---@return string icon
+local function get_base_icon(icon_name)
+  local def = base_icons[icon_name]
+  if not def then
+    return "?"
+  end
+  return use_nerd_font and def.nerd or def.ascii
+end
+
+---Get icon and color for a file extension
 ---@param path string
----@return string
+---@return string icon, string? color
 local function get_file_icon(path)
   local name = vim.fn.fnamemodify(path, ':t'):lower()
   local ext = vim.fn.fnamemodify(path, ':e'):lower()
 
-  -- Check full filename first (for dotfiles)
-  if file_icons[name] then
-    return file_icons[name]
+  -- Check full filename first (for dotfiles like .gitignore)
+  local def = file_icons[name]
+  if def then
+    local icon = use_nerd_font and def.nerd or def.ascii
+    return icon, def.color
   end
 
   -- Check extension
-  if file_icons[ext] then
-    return file_icons[ext]
+  def = file_icons[ext]
+  if def then
+    local icon = use_nerd_font and def.nerd or def.ascii
+    return icon, def.color
   end
 
-  return icons.file_default
+  -- Default file icon
+  local base = base_icons.file
+  return use_nerd_font and base.nerd or base.ascii, base_colors.file
+end
+
+---Select icon set based on config
+---@param use_nerd boolean
+local function select_icon_set(use_nerd)
+  use_nerd_font = use_nerd
+end
+
+-- Cache for dynamically created highlight groups
+local hl_cache = {}
+
+---Get or create a highlight group for an icon color
+---@param color string Hex color like "#51A0CF"
+---@return string hl_group_name
+local function get_icon_hl(color)
+  if not color then
+    return nil
+  end
+
+  -- Create a safe highlight group name from the color
+  local hl_name = "FavdirIcon_" .. color:gsub("#", "")
+
+  -- Cache and create the highlight group if it doesn't exist
+  if not hl_cache[hl_name] then
+    vim.api.nvim_set_hl(0, hl_name, { fg = color })
+    hl_cache[hl_name] = true
+  end
+
+  return hl_name
 end
 
 -- ============================================================================
@@ -266,9 +356,9 @@ local function render_left_panel(mp_state)
     local indent = string.rep("  ", node.level)
     local icon
     if node.has_children then
-      icon = node.is_expanded and icons.expanded or icons.collapsed
+      icon = node.is_expanded and get_base_icon("expanded") or get_base_icon("collapsed")
     else
-      icon = icons.leaf
+      icon = get_base_icon("leaf")
     end
 
     -- Check if this is the selected group
@@ -359,7 +449,14 @@ local function render_right_panel(mp_state)
   end
 
   for _, item in ipairs(items) do
-    local icon = item.type == "dir" and icons.directory or get_file_icon(item.path)
+    local icon, color
+    if item.type == "dir" then
+      icon = get_base_icon("directory")
+      color = base_colors.directory
+    else
+      icon, color = get_file_icon(item.path)
+    end
+
     local name = vim.fn.fnamemodify(item.path, ':t')
 
     -- Shorten home directory
@@ -369,16 +466,18 @@ local function render_right_panel(mp_state)
       display_path = "~" .. display_path:sub(#home + 1)
     end
 
+    local icon_hl = get_icon_hl(color)
+
     if item.type == "dir" then
       cb:spans({
-        { text = icon .. " ", style = "keyword" },
+        { text = icon .. " ", hl_group = icon_hl },
         { text = name, style = "strong" },
         { text = " ", style = "muted" },
         { text = display_path, style = "muted" },
       })
     else
       cb:spans({
-        { text = icon .. " ", style = "string" },
+        { text = icon .. " ", hl_group = icon_hl },
         { text = name },
         { text = " ", style = "muted" },
         { text = display_path, style = "muted" },
@@ -835,18 +934,21 @@ end
 ---Show the favorites UI
 ---@param config FavdirConfig
 function M.show(config)
+  -- Select icon set based on config (Nerd Font or ASCII)
+  select_icon_set(config.use_nerd_font == true)
+
   if panel_state and panel_state:is_valid() then
     -- Already open, focus it
     panel_state:focus_panel(panel_state.focused_panel)
     return
   end
 
-  local nf = require("nvim-float")
+  local nvim_float = require("nvim-float")
 
   local total_height = math.floor(vim.o.lines * config.window_height_ratio)
   local total_width = math.floor(vim.o.columns * config.window_width_ratio)
 
-  panel_state = nf.create_multi_panel({
+  panel_state = nvim_float.create_multi_panel({
     layout = {
       split = "horizontal",
       children = {

@@ -5,7 +5,7 @@
 
 local M = {}
 
-M.version = "0.4.0"
+M.version = "0.5.0"
 
 -- Lazy-loaded modules
 local _state = nil
@@ -38,6 +38,47 @@ end
 ---@field confirm_deletions boolean Confirm before deleting
 ---@field default_groups string[] Default groups on first run
 ---@field protected_groups string[] Groups that cannot be deleted
+---@field use_nerd_font boolean|nil Use Nerd Font icons (nil = auto-detect)
+
+---Detect if Nerd Fonts are likely available
+---@return boolean
+local function detect_nerd_font()
+  -- Check common indicators of Nerd Font usage:
+
+  -- 1. User explicitly set vim.g.have_nerd_font (used by kickstart.nvim and many configs)
+  if vim.g.have_nerd_font == true then
+    return true
+  end
+  if vim.g.have_nerd_font == false then
+    return false
+  end
+
+  -- 2. Check if nvim-web-devicons is available (implies Nerd Font usage)
+  local has_devicons = pcall(require, "nvim-web-devicons")
+  if has_devicons then
+    return true
+  end
+
+  -- 3. Check if mini.icons is available
+  local has_mini_icons = pcall(require, "mini.icons")
+  if has_mini_icons then
+    return true
+  end
+
+  -- 4. Check for common Nerd Font terminal environment hints
+  local term = vim.env.TERM_PROGRAM or ""
+  local nerd_font_terminals = {
+    "WezTerm", "Alacritty", "kitty", "iTerm.app"
+  }
+  for _, t in ipairs(nerd_font_terminals) do
+    if term:find(t, 1, true) then
+      return true
+    end
+  end
+
+  -- Default to false if we can't detect
+  return false
+end
 
 ---@type FavdirConfig
 M.config = {
@@ -49,6 +90,7 @@ M.config = {
   confirm_deletions = true,
   default_groups = { "Work", "Personal", "Projects" },
   protected_groups = { "Uncategorized" },
+  use_nerd_font = nil, -- nil = auto-detect
 }
 
 ---Setup the plugin with user configuration
@@ -56,6 +98,11 @@ M.config = {
 function M.setup(opts)
   opts = opts or {}
   M.config = vim.tbl_deep_extend("force", M.config, opts)
+
+  -- Auto-detect Nerd Font if not explicitly set
+  if M.config.use_nerd_font == nil then
+    M.config.use_nerd_font = detect_nerd_font()
+  end
 
   -- Ensure nvim-float is available
   local ok, nf = pcall(require, "nvim-float")
