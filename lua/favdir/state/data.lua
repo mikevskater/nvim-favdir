@@ -1,0 +1,199 @@
+---@module favdir.state.data
+---Data persistence for favdir - handles loading and saving data files
+
+local M = {}
+
+-- ============================================================================
+-- Data Structures (Type Definitions)
+-- ============================================================================
+
+---@class FavdirItem
+---@field path string Absolute path to file or directory
+---@field type "dir"|"file" Item type
+---@field order number Sort order within group
+
+---@class FavdirGroup
+---@field name string Group name
+---@field items FavdirItem[] Files and directories in this group
+---@field order number Sort order
+---@field children FavdirGroup[]? Child groups (for hierarchy)
+
+---@class FavdirData
+---@field groups FavdirGroup[] Top-level groups
+
+---@class FavdirUIState
+---@field expanded_groups string[] List of expanded group paths (e.g., "Work.Projects")
+---@field last_selected_group string? Last selected group path
+---@field focused_panel "left"|"right" Currently focused panel
+---@field left_cursor {row: number, col: number} Left panel cursor position
+---@field right_cursor {row: number, col: number} Right panel cursor position
+---@field left_sort_mode "custom"|"alpha" Left panel sort mode
+---@field right_sort_mode "custom"|"alpha"|"type" Right panel sort mode
+
+-- ============================================================================
+-- Module State
+-- ============================================================================
+
+---@type FavdirConfig?
+local config = nil
+
+---Initialize the data module with config
+---@param cfg FavdirConfig
+function M.init(cfg)
+  config = cfg
+end
+
+---Get the current config
+---@return FavdirConfig?
+function M.get_config()
+  return config
+end
+
+-- ============================================================================
+-- Data Persistence - Main Data
+-- ============================================================================
+
+---Create default data structure
+---@return FavdirData
+local function create_default_data()
+  local groups = {}
+  -- Only create groups if configured
+  if config and config.default_groups then
+    for i, name in ipairs(config.default_groups) do
+      table.insert(groups, {
+        name = name,
+        items = {},
+        order = i,
+        children = {},
+      })
+    end
+  end
+  return { groups = groups }
+end
+
+---Load data from file
+---@return FavdirData
+function M.load_data()
+  if not config then
+    return create_default_data()
+  end
+
+  local path = config.data_file
+  if vim.fn.filereadable(path) == 0 then
+    return create_default_data()
+  end
+
+  local content = vim.fn.readfile(path)
+  if #content == 0 then
+    return create_default_data()
+  end
+
+  local ok, data = pcall(vim.fn.json_decode, table.concat(content, "\n"))
+  if not ok or type(data) ~= "table" or not data.groups then
+    vim.notify("favdir: Failed to parse data file, using defaults", vim.log.levels.WARN)
+    return create_default_data()
+  end
+
+  return data
+end
+
+---Save data to file
+---@param data FavdirData
+---@return boolean success
+function M.save_data(data)
+  if not config then
+    return false
+  end
+
+  local path = config.data_file
+  local dir = vim.fn.fnamemodify(path, ':h')
+
+  -- Ensure directory exists
+  if vim.fn.isdirectory(dir) == 0 then
+    vim.fn.mkdir(dir, 'p')
+  end
+
+  local ok, json = pcall(vim.fn.json_encode, data)
+  if not ok then
+    vim.notify("favdir: Failed to encode data", vim.log.levels.ERROR)
+    return false
+  end
+
+  local write_ok = pcall(vim.fn.writefile, { json }, path)
+  if not write_ok then
+    vim.notify("favdir: Failed to write data file", vim.log.levels.ERROR)
+    return false
+  end
+
+  return true
+end
+
+-- ============================================================================
+-- Data Persistence - UI State
+-- ============================================================================
+
+---Create default UI state
+---@return FavdirUIState
+local function create_default_ui_state()
+  return {
+    expanded_groups = {},
+    last_selected_group = nil,
+    focused_panel = "left",
+    left_cursor = { row = 1, col = 0 },
+    right_cursor = { row = 1, col = 0 },
+    left_sort_mode = "custom",
+    right_sort_mode = "custom",
+  }
+end
+
+---Load UI state from file
+---@return FavdirUIState
+function M.load_ui_state()
+  if not config then
+    return create_default_ui_state()
+  end
+
+  local path = config.ui_state_file
+  if vim.fn.filereadable(path) == 0 then
+    return create_default_ui_state()
+  end
+
+  local content = vim.fn.readfile(path)
+  if #content == 0 then
+    return create_default_ui_state()
+  end
+
+  local ok, state = pcall(vim.fn.json_decode, table.concat(content, "\n"))
+  if not ok or type(state) ~= "table" then
+    return create_default_ui_state()
+  end
+
+  -- Merge with defaults to handle missing fields
+  return vim.tbl_deep_extend("force", create_default_ui_state(), state)
+end
+
+---Save UI state to file
+---@param state FavdirUIState
+---@return boolean success
+function M.save_ui_state(state)
+  if not config then
+    return false
+  end
+
+  local path = config.ui_state_file
+  local dir = vim.fn.fnamemodify(path, ':h')
+
+  if vim.fn.isdirectory(dir) == 0 then
+    vim.fn.mkdir(dir, 'p')
+  end
+
+  local ok, json = pcall(vim.fn.json_encode, state)
+  if not ok then
+    return false
+  end
+
+  local write_ok = pcall(vim.fn.writefile, { json }, path)
+  return write_ok == true
+end
+
+return M
