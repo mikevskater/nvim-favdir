@@ -406,20 +406,28 @@ local function build_tree(data, ui_state)
   return nodes
 end
 
----Find tree node at line number (1-based)
----@param nodes TreeNode[]
----@param line number 1-based line number
----@return TreeNode?
-local function get_node_at_line(nodes, line)
-  if line < 1 or line > #nodes then
-    return nil
-  end
-  return nodes[line]
-end
-
 -- ============================================================================
 -- Content Rendering
 -- ============================================================================
+
+---Handle group element interaction (Enter key) - only selects, doesn't toggle
+---@param element TrackedElement
+---@param mp_state MultiPanelState
+local function on_group_interact(element, mp_state)
+  if not element or not element.data then return end
+
+  local node = element.data.node
+  if not node then return end
+
+  -- Select this group (don't toggle - that's handled by 'o' key)
+  local ui_state = state_module.load_ui_state()
+  ui_state.last_selected_group = node.full_path
+  state_module.save_ui_state(ui_state)
+
+  -- Refresh both panels
+  mp_state:render_panel("groups")
+  mp_state:render_panel("items")
+end
 
 ---Render left panel (groups)
 ---@param mp_state MultiPanelState
@@ -430,20 +438,15 @@ local function render_left_panel(mp_state)
   local ui_state = state_module.load_ui_state()
   local nodes = build_tree(data, ui_state)
 
-  -- Store nodes in state for reference
-  mp_state.data = mp_state.data or {}
-  mp_state.data.tree_nodes = nodes
-  mp_state.data.main_data = data
-  mp_state.data.ui_state = ui_state
-
-  local ContentBuilder = require("nvim-float.content_builder")
+  local ContentBuilder = require("nvim-float.content")
   local cb = ContentBuilder.new()
 
   if #nodes == 0 then
     cb:muted("No groups. Press 'a' to add one.")
-    local lines = cb:build_lines()
-    local highlights = cb:build_highlights()
-    return lines, highlights
+    -- Store and associate ContentBuilder for element tracking
+    mp_state._groups_content_builder = cb
+    mp_state:set_panel_content_builder("groups", cb)
+    return cb:build_lines(), cb:build_highlights()
   end
 
   for _, node in ipairs(nodes) do
@@ -458,24 +461,53 @@ local function render_left_panel(mp_state)
     -- Check if this is the selected group
     local is_selected = (ui_state.last_selected_group == node.full_path)
 
-    if is_selected then
-      cb:spans({
-        { text = indent },
-        { text = icon .. " ", style = "muted" },
-        { text = node.name, style = "emphasis" },
-      })
-    else
-      cb:spans({
-        { text = indent },
-        { text = icon .. " ", style = "muted" },
-        { text = node.name },
-      })
-    end
+    -- Build line with element tracking
+    cb:spans({
+      {
+        text = indent .. icon .. " " .. node.name,
+        style = is_selected and "emphasis" or nil,
+        track = {
+          name = node.full_path,
+          type = "action",
+          row_based = true,
+          hover_style = "emphasis",
+          data = {
+            node = node,
+            panel = "groups",
+          },
+          on_interact = function(element)
+            on_group_interact(element, mp_state)
+          end,
+        },
+      },
+    })
   end
 
-  local lines = cb:build_lines()
-  local highlights = cb:build_highlights()
-  return lines, highlights
+  -- Store and associate ContentBuilder for element tracking
+  mp_state._groups_content_builder = cb
+  mp_state:set_panel_content_builder("groups", cb)
+
+  return cb:build_lines(), cb:build_highlights()
+end
+
+---Handle item element interaction (Enter key)
+---@param element TrackedElement
+---@param mp_state MultiPanelState
+local function on_item_interact(element, mp_state)
+  if not element or not element.data then return end
+
+  local item = element.data.item
+  if not item then return end
+
+  -- Close the UI first
+  mp_state:close()
+
+  if item.type == "dir" then
+    vim.cmd.cd(item.path)
+    vim.notify("Changed to: " .. item.path, vim.log.levels.INFO)
+  else
+    vim.cmd.edit(item.path)
+  end
 end
 
 ---Render right panel (items in selected group)
@@ -487,35 +519,32 @@ local function render_right_panel(mp_state)
   -- Always load fresh data to ensure we see newly added items
   local data = state_module.load_data()
 
-  local ContentBuilder = require("nvim-float.content_builder")
+  local ContentBuilder = require("nvim-float.content")
   local cb = ContentBuilder.new()
 
   local group_path = ui_state.last_selected_group
   if not group_path then
     cb:muted("← Select a group to view items")
-    local lines = cb:build_lines()
-    local highlights = cb:build_highlights()
-    return lines, highlights
+    -- Store and associate ContentBuilder for element tracking
+    mp_state._items_content_builder = cb
+    mp_state:set_panel_content_builder("items", cb)
+    return cb:build_lines(), cb:build_highlights()
   end
 
   local group = state_module.find_group(data, group_path)
   if not group then
     cb:muted("Group not found")
-    local lines = cb:build_lines()
-    local highlights = cb:build_highlights()
-    return lines, highlights
+    mp_state._items_content_builder = cb
+    mp_state:set_panel_content_builder("items", cb)
+    return cb:build_lines(), cb:build_highlights()
   end
-
-  -- Store items for reference
-  mp_state.data = mp_state.data or {}
-  mp_state.data.current_items = group.items
 
   if #group.items == 0 then
     cb:muted("No items in this group.")
     cb:muted("Press 'a' to add current dir/file.")
-    local lines = cb:build_lines()
-    local highlights = cb:build_highlights()
-    return lines, highlights
+    mp_state._items_content_builder = cb
+    mp_state:set_panel_content_builder("items", cb)
+    return cb:build_lines(), cb:build_highlights()
   end
 
   -- Sort items based on mode
@@ -543,7 +572,10 @@ local function render_right_panel(mp_state)
     end)
   end
 
-  for _, item in ipairs(items) do
+  -- Store sorted items for operations that need index
+  mp_state._sorted_items = items
+
+  for idx, item in ipairs(items) do
     local icon, color
     if item.type == "dir" then
       icon = get_base_icon("directory")
@@ -563,26 +595,38 @@ local function render_right_panel(mp_state)
 
     local icon_hl = get_icon_hl(color)
 
-    if item.type == "dir" then
-      cb:spans({
-        { text = icon .. " ", hl_group = icon_hl },
-        { text = name, style = "strong" },
-        { text = " ", style = "muted" },
-        { text = display_path, style = "muted" },
-      })
-    else
-      cb:spans({
-        { text = icon .. " ", hl_group = icon_hl },
-        { text = name },
-        { text = " ", style = "muted" },
-        { text = display_path, style = "muted" },
-      })
-    end
+    -- Build line with element tracking
+    cb:spans({
+      {
+        text = icon .. " ",
+        hl_group = icon_hl,
+        track = {
+          name = item.path,
+          type = "action",
+          row_based = true,
+          hover_style = "emphasis",
+          data = {
+            item = item,
+            index = idx,
+            group_path = group_path,
+            panel = "items",
+          },
+          on_interact = function(element)
+            on_item_interact(element, mp_state)
+          end,
+        },
+      },
+      { text = name, style = item.type == "dir" and "strong" or nil },
+      { text = " ", style = "muted" },
+      { text = display_path, style = "muted" },
+    })
   end
 
-  local lines = cb:build_lines()
-  local highlights = cb:build_highlights()
-  return lines, highlights
+  -- Store and associate ContentBuilder for element tracking
+  mp_state._items_content_builder = cb
+  mp_state:set_panel_content_builder("items", cb)
+
+  return cb:build_lines(), cb:build_highlights()
 end
 
 -- ============================================================================
@@ -598,10 +642,10 @@ local function handle_toggle_expand(mp_state)
     return
   end
 
-  local row = mp_state:get_cursor("groups")
-  local nodes = mp_state.data and mp_state.data.tree_nodes or {}
-  local node = get_node_at_line(nodes, row)
+  local element = mp_state:get_element_at_cursor()
+  if not element or not element.data then return end
 
+  local node = element.data.node
   if not node then return end
 
   if node.has_children then
@@ -613,52 +657,10 @@ local function handle_toggle_expand(mp_state)
   end
 end
 
----Handle Enter key
+---Handle Enter key - uses interact_at_cursor for element-based interaction
 ---@param mp_state MultiPanelState
 local function handle_enter(mp_state)
-  local focused = mp_state.focused_panel
-  local ui_state = state_module.load_ui_state()
-
-  if focused == "groups" then
-    -- Left panel: select group (and toggle if has children)
-    local row = mp_state:get_cursor("groups")
-    local nodes = mp_state.data and mp_state.data.tree_nodes or {}
-    local node = get_node_at_line(nodes, row)
-
-    if not node then return end
-
-    -- If has children, toggle expansion
-    if node.has_children then
-      state_module.toggle_expanded(node.full_path)
-    end
-
-    -- Select this group
-    ui_state.last_selected_group = node.full_path
-    state_module.save_ui_state(ui_state)
-
-    -- Refresh both panels
-    mp_state:render_panel("groups")
-    mp_state:render_panel("items")
-  else
-    -- Right panel: open directory or file
-    local row = mp_state:get_cursor("items")
-    local items = mp_state.data and mp_state.data.current_items or {}
-
-    if row < 1 or row > #items then return end
-
-    local item = items[row]
-    if not item then return end
-
-    -- Close the UI first
-    mp_state:close()
-
-    if item.type == "dir" then
-      vim.cmd.cd(item.path)
-      vim.notify("Changed to: " .. item.path, vim.log.levels.INFO)
-    else
-      vim.cmd.edit(item.path)
-    end
-  end
+  mp_state:interact_at_cursor()
 end
 
 ---Handle Add key
@@ -668,9 +670,8 @@ local function handle_add(mp_state)
 
   if focused == "groups" then
     -- Add child group
-    local row = mp_state:get_cursor("groups")
-    local nodes = mp_state.data and mp_state.data.tree_nodes or {}
-    local node = get_node_at_line(nodes, row)
+    local element = mp_state:get_element_at_cursor()
+    local node = element and element.data and element.data.node
 
     local parent_path = node and node.full_path or ""
     local title = parent_path ~= "" and ("Add Child to " .. parent_path) or "Add New Group"
@@ -753,12 +754,12 @@ end
 ---@param mp_state MultiPanelState
 local function handle_delete(mp_state)
   local focused = mp_state.focused_panel
+  local element = mp_state:get_element_at_cursor()
+
+  if not element or not element.data then return end
 
   if focused == "groups" then
-    local row = mp_state:get_cursor("groups")
-    local nodes = mp_state.data and mp_state.data.tree_nodes or {}
-    local node = get_node_at_line(nodes, row)
-
+    local node = element.data.node
     if not node then return end
 
     show_confirm_popup("Delete group '" .. node.name .. "'?", function()
@@ -775,20 +776,16 @@ local function handle_delete(mp_state)
       end
     end)
   else
-    local ui_state = state_module.load_ui_state()
-    local group_path = ui_state.last_selected_group
-    if not group_path then return end
+    local item = element.data.item
+    local group_path = element.data.group_path
+    local index = element.data.index
 
-    local row = mp_state:get_cursor("items")
-    local items = mp_state.data and mp_state.data.current_items or {}
+    if not item or not group_path then return end
 
-    if row < 1 or row > #items then return end
-
-    local item = items[row]
     local name = vim.fn.fnamemodify(item.path, ':t')
 
     show_confirm_popup("Remove '" .. name .. "' from group?", function()
-      local ok, err = state_module.remove_item(group_path, row)
+      local ok, err = state_module.remove_item(group_path, index)
       if ok then
         vim.schedule(function()
           if mp_state and mp_state:is_valid() then
@@ -808,10 +805,10 @@ local function handle_rename(mp_state)
   local focused = mp_state.focused_panel
 
   if focused == "groups" then
-    local row = mp_state:get_cursor("groups")
-    local nodes = mp_state.data and mp_state.data.tree_nodes or {}
-    local node = get_node_at_line(nodes, row)
+    local element = mp_state:get_element_at_cursor()
+    if not element or not element.data then return end
 
+    local node = element.data.node
     if not node then return end
 
     show_input_popup("Rename Group", "New Name:", node.name, function(new_name)
@@ -843,14 +840,12 @@ local function handle_move(mp_state)
     return
   end
 
-  local ui_state = state_module.load_ui_state()
-  local from_group = ui_state.last_selected_group
+  local element = mp_state:get_element_at_cursor()
+  if not element or not element.data then return end
+
+  local from_group = element.data.group_path
+  local index = element.data.index
   if not from_group then return end
-
-  local row = mp_state:get_cursor("items")
-  local items = mp_state.data and mp_state.data.current_items or {}
-
-  if row < 1 or row > #items then return end
 
   local groups = state_module.get_group_list()
   -- Filter out current group
@@ -863,9 +858,9 @@ local function handle_move(mp_state)
     return
   end
 
-  show_select_popup("Move to group", groups, function(idx, to_group)
+  show_select_popup("Move to group", groups, function(_, to_group)
     if to_group then
-      local ok, err = state_module.move_item(from_group, row, to_group)
+      local ok, err = state_module.move_item(from_group, index, to_group)
       if ok then
         vim.notify("Moved to " .. to_group, vim.log.levels.INFO)
         vim.schedule(function()
@@ -890,10 +885,10 @@ local function handle_move_group(mp_state)
     return
   end
 
-  local row = mp_state:get_cursor("groups")
-  local nodes = mp_state.data and mp_state.data.tree_nodes or {}
-  local node = get_node_at_line(nodes, row)
+  local element = mp_state:get_element_at_cursor()
+  if not element or not element.data then return end
 
+  local node = element.data.node
   if not node then return end
 
   local group_path = node.full_path
@@ -1004,15 +999,16 @@ local function handle_move_up(mp_state)
   local focused = mp_state.focused_panel
   local ui_state = state_module.load_ui_state()
 
+  local element = mp_state:get_element_at_cursor()
+  if not element or not element.data then return end
+
   if focused == "groups" then
     if ui_state.left_sort_mode ~= "custom" then
       vim.notify("Reorder only works in custom sort mode", vim.log.levels.INFO)
       return
     end
 
-    local row = mp_state:get_cursor("groups")
-    local nodes = mp_state.data and mp_state.data.tree_nodes or {}
-    local node = get_node_at_line(nodes, row)
+    local node = element.data.node
     if not node then return end
 
     -- Get parent path
@@ -1031,6 +1027,7 @@ local function handle_move_up(mp_state)
     end
 
     if idx > 1 then
+      local row = mp_state:get_cursor("groups")
       state_module.reorder_up("group", parent_path, idx)
       mp_state:render_panel("groups")
       mp_state:set_cursor("groups", row - 1)
@@ -1041,12 +1038,13 @@ local function handle_move_up(mp_state)
       return
     end
 
-    local group_path = ui_state.last_selected_group
-    if not group_path then return end
+    local group_path = element.data.group_path
+    local index = element.data.index
+    if not group_path or not index then return end
 
-    local row = mp_state:get_cursor("items")
-    if row > 1 then
-      state_module.reorder_up("item", group_path, row)
+    if index > 1 then
+      local row = mp_state:get_cursor("items")
+      state_module.reorder_up("item", group_path, index)
       mp_state:render_panel("items")
       mp_state:set_cursor("items", row - 1)
     end
@@ -1059,15 +1057,16 @@ local function handle_move_down(mp_state)
   local focused = mp_state.focused_panel
   local ui_state = state_module.load_ui_state()
 
+  local element = mp_state:get_element_at_cursor()
+  if not element or not element.data then return end
+
   if focused == "groups" then
     if ui_state.left_sort_mode ~= "custom" then
       vim.notify("Reorder only works in custom sort mode", vim.log.levels.INFO)
       return
     end
 
-    local row = mp_state:get_cursor("groups")
-    local nodes = mp_state.data and mp_state.data.tree_nodes or {}
-    local node = get_node_at_line(nodes, row)
+    local node = element.data.node
     if not node then return end
 
     local parts = vim.split(node.full_path, ".", { plain = true })
@@ -1084,6 +1083,7 @@ local function handle_move_down(mp_state)
     end
 
     if idx < #parent_list then
+      local row = mp_state:get_cursor("groups")
       state_module.reorder_down("group", parent_path, idx)
       mp_state:render_panel("groups")
       mp_state:set_cursor("groups", row + 1)
@@ -1094,14 +1094,16 @@ local function handle_move_down(mp_state)
       return
     end
 
-    local group_path = ui_state.last_selected_group
-    if not group_path then return end
+    local group_path = element.data.group_path
+    local index = element.data.index
+    if not group_path or not index then return end
 
-    local row = mp_state:get_cursor("items")
-    local items = mp_state.data and mp_state.data.current_items or {}
+    -- Get total items count
+    local items_count = mp_state._sorted_items and #mp_state._sorted_items or 0
 
-    if row < #items then
-      state_module.reorder_down("item", group_path, row)
+    if index < items_count then
+      local row = mp_state:get_cursor("items")
+      state_module.reorder_down("item", group_path, index)
       mp_state:render_panel("items")
       mp_state:set_cursor("items", row + 1)
     end
@@ -1117,12 +1119,12 @@ local function handle_open_split(mp_state, split_cmd)
     return
   end
 
-  local row = mp_state:get_cursor("items")
-  local items = mp_state.data and mp_state.data.current_items or {}
+  local element = mp_state:get_element_at_cursor()
+  if not element or not element.data then return end
 
-  if row < 1 or row > #items then return end
+  local item = element.data.item
+  if not item then return end
 
-  local item = items[row]
   mp_state:close()
 
   vim.cmd(split_cmd)
@@ -1207,7 +1209,7 @@ function M.show(config)
         header = "Open Options",
         keys = {
           { key = "<C-s>", desc = "Open in split" },
-          { key = "<C-v>", desc = "Open in vsplit" },
+          { key = "|", desc = "Open in vsplit" },
           { key = "<C-t>", desc = "Open in tab" },
         },
       },
@@ -1230,6 +1232,15 @@ function M.show(config)
 
   -- Render initial content
   panel_state:render_all()
+
+  -- Enable element tracking for both panels
+  -- Note: ContentBuilder association happens in render functions
+  vim.schedule(function()
+    if panel_state and panel_state:is_valid() then
+      panel_state:enable_element_tracking("groups")
+      panel_state:enable_element_tracking("items")
+    end
+  end)
 
   -- Restore cursor positions
   local ui_state = state_module.load_ui_state()
@@ -1255,7 +1266,7 @@ function M.show(config)
     ["<C-k>"] = function() handle_move_up(panel_state) end,
     ["<C-j>"] = function() handle_move_down(panel_state) end,
     ["<C-s>"] = function() handle_open_split(panel_state, "split") end,
-    ["<C-v>"] = function() handle_open_split(panel_state, "vsplit") end,
+    ["|"] = function() handle_open_split(panel_state, "vsplit") end,
     ["<C-t>"] = function() handle_open_split(panel_state, "tabnew") end,
     ["q"] = function()
       -- Save cursor positions before closing
