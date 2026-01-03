@@ -17,6 +17,98 @@ local panel_state = nil
 -- Public API
 -- ============================================================================
 
+---Build controls list from keymaps config
+---@param keys FavdirKeymaps
+---@return table[]
+local function build_controls(keys)
+  return {
+    {
+      header = "Navigation",
+      keys = {
+        { key = keys.confirm, desc = "Select group / Open item" },
+        { key = keys.expand_or_browse, desc = "Expand group / Browse folder" },
+        { key = keys.go_up, desc = "Go up folder (dir_link)" },
+        { key = keys.next_panel .. "/" .. keys.prev_panel, desc = "Switch panel" },
+        { key = "j/k", desc = "Move cursor" },
+      },
+    },
+    {
+      header = "Actions",
+      keys = {
+        { key = keys.add, desc = "Add group/dir_link/item" },
+        { key = keys.delete, desc = "Delete" },
+        { key = keys.rename, desc = "Rename group" },
+        { key = keys.move, desc = "Move item to group" },
+        { key = keys.move_group, desc = "Move group to parent" },
+      },
+    },
+    {
+      header = "Sorting",
+      keys = {
+        { key = keys.sort, desc = "Cycle sort mode" },
+        { key = keys.reorder_up .. "/" .. keys.reorder_down, desc = "Reorder up/down" },
+      },
+    },
+    {
+      header = "Open Options",
+      keys = {
+        { key = keys.open_split, desc = "Open in split" },
+        { key = keys.open_vsplit, desc = "Open in vsplit" },
+        { key = keys.open_tab, desc = "Open in tab" },
+      },
+    },
+    {
+      header = "Window",
+      keys = {
+        { key = keys.close .. "/" .. keys.close_alt, desc = "Close" },
+      },
+    },
+  }
+end
+
+---Build keymaps table from config
+---@param keys FavdirKeymaps
+---@param ps MultiPanelState
+---@return table<string, function>
+local function build_keymaps(keys, ps)
+  local close_handler = function()
+    local row_l, col_l = ps:get_cursor("groups")
+    local row_r, col_r = ps:get_cursor("items")
+    local uis = state_module.load_ui_state()
+    uis.left_cursor = { row = row_l, col = col_l }
+    uis.right_cursor = { row = row_r, col = col_r }
+    state_module.save_ui_state(uis)
+    ps:close()
+  end
+
+  return {
+    [keys.confirm] = function() handlers.handle_enter(ps) end,
+    [keys.expand_or_browse] = function()
+      if ps.focused_panel == "groups" then
+        handlers.handle_toggle_expand(ps)
+      else
+        handlers.handle_browse_folder(ps)
+      end
+    end,
+    [keys.go_up] = function() handlers.handle_go_up(ps) end,
+    [keys.next_panel] = function() ps:focus_next_panel() end,
+    [keys.prev_panel] = function() ps:focus_prev_panel() end,
+    [keys.add] = function() handlers.handle_add(ps) end,
+    [keys.delete] = function() handlers.handle_delete(ps) end,
+    [keys.rename] = function() handlers.handle_rename(ps) end,
+    [keys.move] = function() handlers.handle_move(ps) end,
+    [keys.move_group] = function() handlers.handle_move_group(ps) end,
+    [keys.sort] = function() handlers.handle_sort(ps) end,
+    [keys.reorder_up] = function() handlers.handle_move_up(ps) end,
+    [keys.reorder_down] = function() handlers.handle_move_down(ps) end,
+    [keys.open_split] = function() handlers.handle_open_split(ps, "split") end,
+    [keys.open_vsplit] = function() handlers.handle_open_split(ps, "vsplit") end,
+    [keys.open_tab] = function() handlers.handle_open_split(ps, "tabnew") end,
+    [keys.close] = close_handler,
+    [keys.close_alt] = close_handler,
+  }
+end
+
 ---Show the favorites UI
 ---@param config FavdirConfig
 function M.show(config)
@@ -30,6 +122,7 @@ function M.show(config)
   end
 
   local nvim_float = require("nvim-float")
+  local keys = config.keymaps
 
   panel_state = nvim_float.create_multi_panel({
     layout = {
@@ -53,49 +146,7 @@ function M.show(config)
     total_height_ratio = config.window_height_ratio,
     footer = "? = Controls",
     initial_focus = "groups",
-    controls = {
-      {
-        header = "Navigation",
-        keys = {
-          { key = "<CR>", desc = "Select group / Open item" },
-          { key = "o", desc = "Expand group / Browse folder" },
-          { key = "<BS>", desc = "Go up folder (dir_link)" },
-          { key = "<Tab>/<S-Tab>", desc = "Switch panel" },
-          { key = "j/k", desc = "Move cursor" },
-        },
-      },
-      {
-        header = "Actions",
-        keys = {
-          { key = "a", desc = "Add group/dir_link/item" },
-          { key = "d", desc = "Delete" },
-          { key = "r", desc = "Rename group" },
-          { key = "m", desc = "Move item to group" },
-          { key = "M", desc = "Move group to parent" },
-        },
-      },
-      {
-        header = "Sorting",
-        keys = {
-          { key = "s", desc = "Cycle sort mode" },
-          { key = "<C-k>/<C-j>", desc = "Reorder up/down" },
-        },
-      },
-      {
-        header = "Open Options",
-        keys = {
-          { key = "<C-s>", desc = "Open in split" },
-          { key = "|", desc = "Open in vsplit" },
-          { key = "<C-t>", desc = "Open in tab" },
-        },
-      },
-      {
-        header = "Window",
-        keys = {
-          { key = "q/<Esc>", desc = "Close" },
-        },
-      },
-    },
+    controls = build_controls(keys),
     on_close = function()
       panel_state = nil
     end,
@@ -127,52 +178,8 @@ function M.show(config)
     panel_state:set_cursor("items", ui_state.right_cursor.row, ui_state.right_cursor.col)
   end
 
-  -- Setup keymaps
-  panel_state:set_keymaps({
-    ["<CR>"] = function() handlers.handle_enter(panel_state) end,
-    ["o"] = function()
-      -- On left panel: toggle expand/collapse
-      -- On right panel in dir_link view: browse into folder
-      if panel_state.focused_panel == "groups" then
-        handlers.handle_toggle_expand(panel_state)
-      else
-        handlers.handle_browse_folder(panel_state)
-      end
-    end,
-    ["<BS>"] = function() handlers.handle_go_up(panel_state) end,
-    ["<Tab>"] = function() panel_state:focus_next_panel() end,
-    ["<S-Tab>"] = function() panel_state:focus_prev_panel() end,
-    ["a"] = function() handlers.handle_add(panel_state) end,
-    ["d"] = function() handlers.handle_delete(panel_state) end,
-    ["r"] = function() handlers.handle_rename(panel_state) end,
-    ["m"] = function() handlers.handle_move(panel_state) end,
-    ["M"] = function() handlers.handle_move_group(panel_state) end,
-    ["s"] = function() handlers.handle_sort(panel_state) end,
-    ["<C-k>"] = function() handlers.handle_move_up(panel_state) end,
-    ["<C-j>"] = function() handlers.handle_move_down(panel_state) end,
-    ["<C-s>"] = function() handlers.handle_open_split(panel_state, "split") end,
-    ["|"] = function() handlers.handle_open_split(panel_state, "vsplit") end,
-    ["<C-t>"] = function() handlers.handle_open_split(panel_state, "tabnew") end,
-    ["q"] = function()
-      -- Save cursor positions before closing
-      local row_l, col_l = panel_state:get_cursor("groups")
-      local row_r, col_r = panel_state:get_cursor("items")
-      local uis = state_module.load_ui_state()
-      uis.left_cursor = { row = row_l, col = col_l }
-      uis.right_cursor = { row = row_r, col = col_r }
-      state_module.save_ui_state(uis)
-      panel_state:close()
-    end,
-    ["<Esc>"] = function()
-      local row_l, col_l = panel_state:get_cursor("groups")
-      local row_r, col_r = panel_state:get_cursor("items")
-      local uis = state_module.load_ui_state()
-      uis.left_cursor = { row = row_l, col = col_l }
-      uis.right_cursor = { row = row_r, col = col_r }
-      state_module.save_ui_state(uis)
-      panel_state:close()
-    end,
-  })
+  -- Setup keymaps from config
+  panel_state:set_keymaps(build_keymaps(keys, panel_state))
 end
 
 ---Toggle the UI

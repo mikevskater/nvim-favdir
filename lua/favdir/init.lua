@@ -10,6 +10,27 @@ M.version = "1.1.1"
 local state = require("favdir.state")
 local ui = require("favdir.ui")
 
+---@class FavdirKeymaps
+---@field open string|false Global keymap to open UI (false to disable)
+---@field confirm string Select group / Open item
+---@field expand_or_browse string Expand group / Browse folder
+---@field go_up string Go up folder level
+---@field next_panel string Switch to next panel
+---@field prev_panel string Switch to previous panel
+---@field add string Add group/dir_link/item
+---@field delete string Delete
+---@field rename string Rename group
+---@field move string Move item to group
+---@field move_group string Move group to parent
+---@field sort string Cycle sort mode
+---@field reorder_up string Reorder up
+---@field reorder_down string Reorder down
+---@field open_split string Open in split
+---@field open_vsplit string Open in vsplit
+---@field open_tab string Open in tab
+---@field close string Close UI
+---@field close_alt string Alternative close key
+
 ---@class FavdirConfig
 ---@field data_file string Path to data file
 ---@field ui_state_file string Path to UI state file
@@ -19,6 +40,7 @@ local ui = require("favdir.ui")
 ---@field default_groups string[] Default groups on first run
 ---@field protected_groups string[] Groups that cannot be deleted/moved
 ---@field use_nerd_font boolean Use Nerd Font icons
+---@field keymaps FavdirKeymaps Keymaps configuration
 
 ---@type FavdirConfig
 M.config = {
@@ -30,9 +52,52 @@ M.config = {
   default_groups = {},
   protected_groups = {},
   use_nerd_font = true,
+  keymaps = {
+    -- Global
+    open = "<leader>ofd",
+    -- Navigation
+    confirm = "<CR>",
+    expand_or_browse = "o",
+    go_up = "<BS>",
+    next_panel = "<Tab>",
+    prev_panel = "<S-Tab>",
+    -- Actions
+    add = "a",
+    delete = "d",
+    rename = "r",
+    move = "m",
+    move_group = "M",
+    -- Sorting
+    sort = "s",
+    reorder_up = "<C-k>",
+    reorder_down = "<C-j>",
+    -- Open options
+    open_split = "<C-s>",
+    open_vsplit = "|",
+    open_tab = "<C-t>",
+    -- Window
+    close = "q",
+    close_alt = "<Esc>",
+  },
 }
 
 local initialized = false
+local keymaps_set = false
+
+---Setup global keymaps based on config
+local function setup_keymaps()
+  if keymaps_set then return end
+
+  local keymaps = M.config.keymaps
+  if keymaps.open and keymaps.open ~= false then
+    vim.keymap.set("n", keymaps.open, "<cmd>FavdirOpen<cr>", {
+      desc = "Open favorite directories",
+      silent = true,
+    })
+  end
+
+  keymaps_set = true
+end
 
 ---Detect if Nerd Fonts are likely available
 ---@return boolean
@@ -80,7 +145,9 @@ end
 function M.setup(opts)
   M.config = vim.tbl_deep_extend("force", M.config, opts or {})
   initialized = false
+  keymaps_set = false
   init()
+  setup_keymaps()
 end
 
 ---Show the favorites UI
