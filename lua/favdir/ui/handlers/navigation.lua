@@ -45,4 +45,114 @@ function M.handle_enter(mp_state)
   mp_state:interact_at_cursor()
 end
 
+-- ============================================================================
+-- Directory Link Folder Navigation
+-- ============================================================================
+
+---Handle browse folder (o key) - enter a folder to show its contents
+---Works for both dir_link views and regular group directory items
+---@param mp_state MultiPanelState
+function M.handle_browse_folder(mp_state)
+  local focused = mp_state.focused_panel
+
+  -- Only works on items panel
+  if focused ~= "items" then
+    return
+  end
+
+  local element = mp_state:get_element_at_cursor()
+  if not element or not element.data then
+    return
+  end
+
+  local item = element.data.item
+  if not item then
+    return
+  end
+
+  -- Only browse directories (including parent "..")
+  if item.type ~= "dir" and item.type ~= "parent" then
+    vim.notify("Not a directory", vim.log.levels.INFO)
+    return
+  end
+
+  local ui_state = state_module.load_ui_state()
+
+  if ui_state.is_browsing_directory then
+    -- Already in browse mode (from opening a directory item) - navigate deeper
+    ui_state.browse_current_path = item.path
+  elseif mp_state._is_dir_link_view then
+    -- In dir_link view (selected from left panel) - navigate deeper
+    ui_state.dir_link_current_path = item.path
+  else
+    -- Opening a directory item from a regular group view
+    -- Enter browse mode with this directory as the base
+    ui_state.is_browsing_directory = true
+    ui_state.browse_base_path = item.path
+    ui_state.browse_current_path = item.path
+  end
+
+  state_module.save_ui_state(ui_state)
+
+  -- Re-render items panel
+  mp_state:render_panel("items")
+
+  -- Move cursor to first item
+  mp_state:set_cursor("items", 1, 0)
+end
+
+---Handle go up (backspace) - go up one folder level when browsing directories
+---@param mp_state MultiPanelState
+function M.handle_go_up(mp_state)
+  local focused = mp_state.focused_panel
+
+  -- Only works on items panel when in browse mode
+  if focused ~= "items" or not mp_state._is_dir_link_view then
+    return
+  end
+
+  local base_path = mp_state._dir_link_base_path
+  local current_path = mp_state._dir_link_current_path
+
+  if not base_path or not current_path then
+    return
+  end
+
+  -- Normalize paths for comparison
+  local base_normalized = vim.fn.fnamemodify(base_path, ':p')
+  local current_normalized = vim.fn.fnamemodify(current_path, ':p')
+
+  -- Check if already at base path
+  if base_normalized == current_normalized then
+    -- If we entered browse mode from a group item, exit browse mode
+    local ui_state = state_module.load_ui_state()
+    if ui_state.is_browsing_directory then
+      ui_state.is_browsing_directory = false
+      ui_state.browse_base_path = nil
+      ui_state.browse_current_path = nil
+      state_module.save_ui_state(ui_state)
+      mp_state:render_panel("items")
+      vim.notify("Exited directory browse", vim.log.levels.INFO)
+    else
+      vim.notify("Already at top level", vim.log.levels.INFO)
+    end
+    return
+  end
+
+  -- Go up one level
+  local parent_path = vim.fn.fnamemodify(current_path, ':h')
+
+  -- Update current path in UI state
+  local ui_state = state_module.load_ui_state()
+  if ui_state.is_browsing_directory then
+    ui_state.browse_current_path = parent_path
+  else
+    ui_state.dir_link_current_path = parent_path
+  end
+  state_module.save_ui_state(ui_state)
+
+  -- Re-render items panel
+  mp_state:render_panel("items")
+end
+
 return M

@@ -31,7 +31,11 @@ local M = {}
 ---@field expanded_groups string[] List of expanded group paths (e.g., "Work.Projects")
 ---@field last_selected_group string? Last selected group path
 ---@field last_selected_type "group"|"dir_link"? Type of last selected item
----@field last_selected_dir_link string? Path to selected dir_link's directory
+---@field last_selected_dir_link string? Base path of selected dir_link's directory
+---@field dir_link_current_path string? Current browsing path within dir_link (for navigation)
+---@field is_browsing_directory boolean? Whether we're in directory browse mode
+---@field browse_base_path string? Base path for directory browsing (can't go above this)
+---@field browse_current_path string? Current path when browsing a directory
 ---@field focused_panel "left"|"right" Currently focused panel
 ---@field left_cursor {row: number, col: number} Left panel cursor position
 ---@field right_cursor {row: number, col: number} Right panel cursor position
@@ -149,6 +153,10 @@ local function create_default_ui_state()
     last_selected_group = nil,
     last_selected_type = "group",
     last_selected_dir_link = nil,
+    dir_link_current_path = nil,
+    is_browsing_directory = false,
+    browse_base_path = nil,
+    browse_current_path = nil,
     focused_panel = "left",
     left_cursor = { row = 1, col = 0 },
     right_cursor = { row = 1, col = 0 },

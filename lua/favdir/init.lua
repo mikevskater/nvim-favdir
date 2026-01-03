@@ -5,7 +5,7 @@
 
 local M = {}
 
-M.version = "1.1.0"
+M.version = "1.1.1"
 
 local state = require("favdir.state")
 local ui = require("favdir.ui")

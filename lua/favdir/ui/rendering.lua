@@ -126,16 +126,23 @@ function M.on_group_interact(element, mp_state)
 
   local ui_state = state_module.load_ui_state()
 
+  -- Reset browse state when selecting anything on left panel
+  ui_state.is_browsing_directory = false
+  ui_state.browse_base_path = nil
+  ui_state.browse_current_path = nil
+
   if node.is_dir_link then
-    -- Select this dir_link
+    -- Select this dir_link (reset navigation to base path)
     ui_state.last_selected_type = "dir_link"
     ui_state.last_selected_dir_link = node.dir_path
+    ui_state.dir_link_current_path = nil -- Reset to base path
     ui_state.last_selected_group = nil
   else
     -- Select this group (don't toggle - that's handled by 'o' key)
     ui_state.last_selected_type = "group"
     ui_state.last_selected_group = node.full_path
     ui_state.last_selected_dir_link = nil
+    ui_state.dir_link_current_path = nil
   end
 
   state_module.save_ui_state(ui_state)
@@ -153,6 +160,13 @@ function M.on_item_interact(element, mp_state)
 
   local item = element.data.item
   if not item then return end
+
+  -- Handle "../" parent entry - trigger go up navigation instead of opening
+  if item.type == "parent" then
+    local navigation = require("favdir.ui.handlers.navigation")
+    navigation.handle_go_up(mp_state)
+    return
+  end
 
   -- Close the UI first
   mp_state:close()
@@ -251,12 +265,26 @@ function M.render_right_panel(mp_state)
   local ContentBuilder = require("nvim-float.content")
   local cb = ContentBuilder.new()
 
+  -- Check if we're in directory browse mode (from opening a directory item)
+  if ui_state.is_browsing_directory and ui_state.browse_base_path then
+    local base_path = ui_state.browse_base_path
+    local current_path = ui_state.browse_current_path or base_path
+    return M.render_dir_link_contents(mp_state, cb, base_path, current_path)
+  end
+
   -- Check if a dir_link is selected
   if ui_state.last_selected_type == "dir_link" and ui_state.last_selected_dir_link then
-    return M.render_dir_link_contents(mp_state, cb, ui_state.last_selected_dir_link)
+    local base_path = ui_state.last_selected_dir_link
+    local current_path = ui_state.dir_link_current_path or base_path
+    return M.render_dir_link_contents(mp_state, cb, base_path, current_path)
   end
 
   -- Otherwise, render group items (original behavior)
+  -- Reset dir_link view flags since we're viewing regular group items
+  mp_state._is_dir_link_view = false
+  mp_state._dir_link_base_path = nil
+  mp_state._dir_link_current_path = nil
+
   local data = state_module.load_data()
   local group_path = ui_state.last_selected_group
 
@@ -353,21 +381,33 @@ end
 ---Render filesystem contents for a directory link
 ---@param mp_state MultiPanelState
 ---@param cb any ContentBuilder instance
----@param dir_path string Directory path to scan
+---@param base_path string Base directory path (the dir_link's original path)
+---@param current_path string Current browsing path (may be a subfolder)
 ---@return string[] lines
 ---@return table[] highlights
-function M.render_dir_link_contents(mp_state, cb, dir_path)
+function M.render_dir_link_contents(mp_state, cb, base_path, current_path)
   -- Validate directory exists
-  if vim.fn.isdirectory(dir_path) ~= 1 then
+  if vim.fn.isdirectory(current_path) ~= 1 then
     cb:muted("Directory not found:")
-    cb:muted(dir_path)
+    cb:muted(current_path)
     mp_state._items_content_builder = cb
     mp_state:set_panel_content_builder("items", cb)
     return cb:build_lines(), cb:build_highlights()
   end
 
+  -- Store base path for navigation validation
+  mp_state._dir_link_base_path = base_path
+  mp_state._dir_link_current_path = current_path
+
+  -- Check if we're in a subfolder (show "../" entry)
+  local is_in_subfolder = vim.fn.fnamemodify(current_path, ':p') ~= vim.fn.fnamemodify(base_path, ':p')
+
+  -- In browse mode (from group directory item), always show "../" as exit indicator
+  local ui_state = state_module.load_ui_state()
+  local show_parent_entry = is_in_subfolder or ui_state.is_browsing_directory
+
   -- Read directory contents
-  local ok, entries = pcall(vim.fn.readdir, dir_path)
+  local ok, entries = pcall(vim.fn.readdir, current_path)
   if not ok or not entries then
     cb:muted("Failed to read directory")
     mp_state._items_content_builder = cb
@@ -375,17 +415,20 @@ function M.render_dir_link_contents(mp_state, cb, dir_path)
     return cb:build_lines(), cb:build_highlights()
   end
 
-  if #entries == 0 then
-    cb:muted("Directory is empty")
-    mp_state._items_content_builder = cb
-    mp_state:set_panel_content_builder("items", cb)
-    return cb:build_lines(), cb:build_highlights()
-  end
-
   -- Build items list with type info
   local items = {}
+
+  -- Add "../" entry if in subfolder OR in browse mode (as exit indicator)
+  if show_parent_entry then
+    table.insert(items, {
+      name = "..",
+      path = vim.fn.fnamemodify(current_path, ':h'),
+      type = "parent",
+    })
+  end
+
   for _, entry in ipairs(entries) do
-    local full_path = dir_path .. "/" .. entry
+    local full_path = current_path .. "/" .. entry
     local is_dir = vim.fn.isdirectory(full_path) == 1
     table.insert(items, {
       name = entry,
@@ -394,8 +437,10 @@ function M.render_dir_link_contents(mp_state, cb, dir_path)
     })
   end
 
-  -- Sort: directories first, then alphabetically
+  -- Sort: parent first, then directories, then files alphabetically
   table.sort(items, function(a, b)
+    if a.type == "parent" then return true end
+    if b.type == "parent" then return false end
     if a.type ~= b.type then
       return a.type == "dir"
     end
@@ -406,16 +451,26 @@ function M.render_dir_link_contents(mp_state, cb, dir_path)
   mp_state._sorted_items = items
   mp_state._is_dir_link_view = true
 
+  if #entries == 0 and not show_parent_entry then
+    cb:muted("Directory is empty")
+    mp_state._items_content_builder = cb
+    mp_state:set_panel_content_builder("items", cb)
+    return cb:build_lines(), cb:build_highlights()
+  end
+
   for _, item in ipairs(items) do
     local icon, color
-    if item.type == "dir" then
+    if item.type == "parent" then
+      icon = icons.get_base_icon("collapsed")
+      color = nil
+    elseif item.type == "dir" then
       icon = icons.get_base_icon("directory")
       color = icons.get_directory_color()
     else
       icon, color = icons.get_file_icon(item.path)
     end
 
-    local icon_hl = icons.get_icon_hl(color)
+    local icon_hl = color and icons.get_icon_hl(color) or nil
 
     -- Build line with element tracking
     cb:spans({
@@ -431,13 +486,14 @@ function M.render_dir_link_contents(mp_state, cb, dir_path)
             item = item,
             panel = "items",
             is_dir_link_view = true,
+            base_path = base_path,
           },
           on_interact = function(element)
             M.on_item_interact(element, mp_state)
           end,
         },
       },
-      { text = item.name, style = item.type == "dir" and "strong" or nil },
+      { text = item.name, style = (item.type == "dir" or item.type == "parent") and "strong" or nil },
     })
   end
 

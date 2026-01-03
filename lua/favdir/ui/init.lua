@@ -58,7 +58,8 @@ function M.show(config)
         header = "Navigation",
         keys = {
           { key = "<CR>", desc = "Select group / Open item" },
-          { key = "o", desc = "Expand/Collapse group" },
+          { key = "o", desc = "Expand group / Browse folder" },
+          { key = "<BS>", desc = "Go up folder (dir_link)" },
           { key = "<Tab>/<S-Tab>", desc = "Switch panel" },
           { key = "j/k", desc = "Move cursor" },
         },
@@ -66,7 +67,7 @@ function M.show(config)
       {
         header = "Actions",
         keys = {
-          { key = "a", desc = "Add group/item" },
+          { key = "a", desc = "Add group/dir_link/item" },
           { key = "d", desc = "Delete" },
           { key = "r", desc = "Rename group" },
           { key = "m", desc = "Move item to group" },
@@ -129,7 +130,16 @@ function M.show(config)
   -- Setup keymaps
   panel_state:set_keymaps({
     ["<CR>"] = function() handlers.handle_enter(panel_state) end,
-    ["o"] = function() handlers.handle_toggle_expand(panel_state) end,
+    ["o"] = function()
+      -- On left panel: toggle expand/collapse
+      -- On right panel in dir_link view: browse into folder
+      if panel_state.focused_panel == "groups" then
+        handlers.handle_toggle_expand(panel_state)
+      else
+        handlers.handle_browse_folder(panel_state)
+      end
+    end,
+    ["<BS>"] = function() handlers.handle_go_up(panel_state) end,
     ["<Tab>"] = function() panel_state:focus_next_panel() end,
     ["<S-Tab>"] = function() panel_state:focus_prev_panel() end,
     ["a"] = function() handlers.handle_add(panel_state) end,

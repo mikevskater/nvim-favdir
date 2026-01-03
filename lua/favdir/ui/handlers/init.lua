@@ -15,6 +15,8 @@ local opening = require("favdir.ui.handlers.opening")
 
 M.handle_enter = navigation.handle_enter
 M.handle_toggle_expand = navigation.handle_toggle_expand
+M.handle_browse_folder = navigation.handle_browse_folder
+M.handle_go_up = navigation.handle_go_up
 
 -- ============================================================================
 -- Re-export Editing Handlers
