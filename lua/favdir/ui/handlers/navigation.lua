@@ -24,6 +24,12 @@ function M.handle_toggle_expand(mp_state)
   local node = element.data.node
   if not node then return end
 
+  -- Directory links cannot be expanded
+  if node.is_dir_link then
+    vim.notify("Directory links cannot be expanded", vim.log.levels.INFO)
+    return
+  end
+
   if node.has_children then
     -- Toggle expansion
     state_module.toggle_expanded(node.full_path)

@@ -40,6 +40,11 @@ M.remove_group = groups_module.remove_group
 M.rename_group = groups_module.rename_group
 M.move_group = groups_module.move_group
 
+-- Directory link functions
+M.add_dir_link = groups_module.add_dir_link
+M.remove_dir_link = groups_module.remove_dir_link
+M.find_dir_link = groups_module.find_dir_link
+
 -- ============================================================================
 -- Re-export Items Module Functions
 -- ============================================================================

@@ -15,9 +15,12 @@ local icons = require("favdir.ui.icons")
 ---@field full_path string Full group path (e.g., "Work.Projects")
 ---@field level number Indentation level (0-based)
 ---@field is_expanded boolean Whether expanded
----@field has_children boolean Whether has child groups
----@field is_leaf boolean Whether this is a leaf group (no children)
----@field group FavdirGroup Reference to the group
+---@field has_children boolean Whether has child groups or dir_links
+---@field is_leaf boolean Whether this is a leaf (no children/dir_links)
+---@field is_dir_link boolean Whether this is a directory link
+---@field dir_path string? Filesystem path for dir_links
+---@field group FavdirGroup? Reference to the group (nil for dir_links)
+---@field dir_link FavdirDirLink? Reference to the dir_link (nil for groups)
 
 -- ============================================================================
 -- Tree Building
@@ -39,7 +42,8 @@ function M.build_tree(data, ui_state)
 
     for _, group in ipairs(sorted) do
       local path = prefix == "" and group.name or (prefix .. "." .. group.name)
-      local has_children = group.children and #group.children > 0
+      local has_children = (group.children and #group.children > 0)
+        or (group.dir_links and #group.dir_links > 0)
       local is_expanded = state_module.is_expanded(ui_state, path)
 
       table.insert(nodes, {
@@ -49,12 +53,56 @@ function M.build_tree(data, ui_state)
         is_expanded = is_expanded,
         has_children = has_children,
         is_leaf = not has_children,
+        is_dir_link = false,
+        dir_path = nil,
         group = group,
+        dir_link = nil,
       })
 
-      -- Recursively add children if expanded
-      if has_children and is_expanded then
-        collect(group.children, path, level + 1)
+      -- Recursively add children and dir_links if expanded
+      if is_expanded then
+        -- Collect children and dir_links, sort together by order
+        local child_items = {}
+
+        if group.children then
+          for _, child in ipairs(group.children) do
+            table.insert(child_items, { type = "group", item = child, order = child.order or 0 })
+          end
+        end
+
+        if group.dir_links then
+          for _, link in ipairs(group.dir_links) do
+            table.insert(child_items, { type = "dir_link", item = link, order = link.order or 0 })
+          end
+        end
+
+        -- Sort by order
+        table.sort(child_items, function(a, b)
+          return a.order < b.order
+        end)
+
+        for _, child_item in ipairs(child_items) do
+          if child_item.type == "group" then
+            -- Recursively collect this group
+            collect({ child_item.item }, path, level + 1)
+          else
+            -- Add dir_link node
+            local link = child_item.item
+            local link_path = path .. "." .. link.name
+            table.insert(nodes, {
+              name = link.name,
+              full_path = link_path,
+              level = level + 1,
+              is_expanded = false,
+              has_children = false,
+              is_leaf = true,
+              is_dir_link = true,
+              dir_path = link.path,
+              group = nil,
+              dir_link = link,
+            })
+          end
+        end
       end
     end
   end
@@ -67,7 +115,7 @@ end
 -- Interaction Handlers (called from element tracking)
 -- ============================================================================
 
----Handle group element interaction (Enter key) - only selects, doesn't toggle
+---Handle group/dir_link element interaction (Enter key) - only selects, doesn't toggle
 ---@param element TrackedElement
 ---@param mp_state MultiPanelState
 function M.on_group_interact(element, mp_state)
@@ -76,9 +124,20 @@ function M.on_group_interact(element, mp_state)
   local node = element.data.node
   if not node then return end
 
-  -- Select this group (don't toggle - that's handled by 'o' key)
   local ui_state = state_module.load_ui_state()
-  ui_state.last_selected_group = node.full_path
+
+  if node.is_dir_link then
+    -- Select this dir_link
+    ui_state.last_selected_type = "dir_link"
+    ui_state.last_selected_dir_link = node.dir_path
+    ui_state.last_selected_group = nil
+  else
+    -- Select this group (don't toggle - that's handled by 'o' key)
+    ui_state.last_selected_type = "group"
+    ui_state.last_selected_group = node.full_path
+    ui_state.last_selected_dir_link = nil
+  end
+
   state_module.save_ui_state(ui_state)
 
   -- Refresh both panels
@@ -133,14 +192,26 @@ function M.render_left_panel(mp_state)
   for _, node in ipairs(nodes) do
     local indent = string.rep("  ", node.level)
     local icon
-    if node.has_children then
+
+    if node.is_dir_link then
+      -- Directory link: use folder icon
+      icon = icons.get_base_icon("directory")
+    elseif node.has_children then
+      -- Group with children: use expand/collapse icon
       icon = node.is_expanded and icons.get_base_icon("expanded") or icons.get_base_icon("collapsed")
     else
+      -- Leaf group: use leaf icon
       icon = icons.get_base_icon("leaf")
     end
 
-    -- Check if this is the selected group
-    local is_selected = (ui_state.last_selected_group == node.full_path)
+    -- Check if this is the selected item (group or dir_link)
+    local is_selected = false
+    if node.is_dir_link then
+      is_selected = (ui_state.last_selected_type == "dir_link" and ui_state.last_selected_dir_link == node.dir_path)
+    else
+      is_selected = (ui_state.last_selected_type == "group" and ui_state.last_selected_group == node.full_path)
+        or (ui_state.last_selected_type == nil and ui_state.last_selected_group == node.full_path)
+    end
 
     -- Build line with element tracking
     cb:spans({
@@ -171,22 +242,26 @@ function M.render_left_panel(mp_state)
   return cb:build_lines(), cb:build_highlights()
 end
 
----Render right panel (items in selected group)
+---Render right panel (items in selected group or directory contents for dir_link)
 ---@param mp_state MultiPanelState
 ---@return string[] lines
 ---@return table[] highlights
 function M.render_right_panel(mp_state)
   local ui_state = state_module.load_ui_state()
-  -- Always load fresh data to ensure we see newly added items
-  local data = state_module.load_data()
-
   local ContentBuilder = require("nvim-float.content")
   local cb = ContentBuilder.new()
 
+  -- Check if a dir_link is selected
+  if ui_state.last_selected_type == "dir_link" and ui_state.last_selected_dir_link then
+    return M.render_dir_link_contents(mp_state, cb, ui_state.last_selected_dir_link)
+  end
+
+  -- Otherwise, render group items (original behavior)
+  local data = state_module.load_data()
   local group_path = ui_state.last_selected_group
+
   if not group_path then
     cb:muted("← Select a group to view items")
-    -- Store and associate ContentBuilder for element tracking
     mp_state._items_content_builder = cb
     mp_state:set_panel_content_builder("items", cb)
     return cb:build_lines(), cb:build_highlights()
@@ -265,6 +340,107 @@ function M.render_right_panel(mp_state)
   end
 
   -- Store and associate ContentBuilder for element tracking
+  mp_state._items_content_builder = cb
+  mp_state:set_panel_content_builder("items", cb)
+
+  return cb:build_lines(), cb:build_highlights()
+end
+
+-- ============================================================================
+-- Directory Link Contents Rendering
+-- ============================================================================
+
+---Render filesystem contents for a directory link
+---@param mp_state MultiPanelState
+---@param cb any ContentBuilder instance
+---@param dir_path string Directory path to scan
+---@return string[] lines
+---@return table[] highlights
+function M.render_dir_link_contents(mp_state, cb, dir_path)
+  -- Validate directory exists
+  if vim.fn.isdirectory(dir_path) ~= 1 then
+    cb:muted("Directory not found:")
+    cb:muted(dir_path)
+    mp_state._items_content_builder = cb
+    mp_state:set_panel_content_builder("items", cb)
+    return cb:build_lines(), cb:build_highlights()
+  end
+
+  -- Read directory contents
+  local ok, entries = pcall(vim.fn.readdir, dir_path)
+  if not ok or not entries then
+    cb:muted("Failed to read directory")
+    mp_state._items_content_builder = cb
+    mp_state:set_panel_content_builder("items", cb)
+    return cb:build_lines(), cb:build_highlights()
+  end
+
+  if #entries == 0 then
+    cb:muted("Directory is empty")
+    mp_state._items_content_builder = cb
+    mp_state:set_panel_content_builder("items", cb)
+    return cb:build_lines(), cb:build_highlights()
+  end
+
+  -- Build items list with type info
+  local items = {}
+  for _, entry in ipairs(entries) do
+    local full_path = dir_path .. "/" .. entry
+    local is_dir = vim.fn.isdirectory(full_path) == 1
+    table.insert(items, {
+      name = entry,
+      path = full_path,
+      type = is_dir and "dir" or "file",
+    })
+  end
+
+  -- Sort: directories first, then alphabetically
+  table.sort(items, function(a, b)
+    if a.type ~= b.type then
+      return a.type == "dir"
+    end
+    return a.name:lower() < b.name:lower()
+  end)
+
+  -- Store for operations
+  mp_state._sorted_items = items
+  mp_state._is_dir_link_view = true
+
+  for _, item in ipairs(items) do
+    local icon, color
+    if item.type == "dir" then
+      icon = icons.get_base_icon("directory")
+      color = icons.get_directory_color()
+    else
+      icon, color = icons.get_file_icon(item.path)
+    end
+
+    local icon_hl = icons.get_icon_hl(color)
+
+    -- Build line with element tracking
+    cb:spans({
+      {
+        text = icon .. " ",
+        hl_group = icon_hl,
+        track = {
+          name = item.path,
+          type = "action",
+          row_based = true,
+          hover_style = "emphasis",
+          data = {
+            item = item,
+            panel = "items",
+            is_dir_link_view = true,
+          },
+          on_interact = function(element)
+            M.on_item_interact(element, mp_state)
+          end,
+        },
+      },
+      { text = item.name, style = item.type == "dir" and "strong" or nil },
+    })
+  end
+
   mp_state._items_content_builder = cb
   mp_state:set_panel_content_builder("items", cb)
 

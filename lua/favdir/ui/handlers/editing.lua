@@ -16,31 +16,75 @@ function M.handle_add(mp_state)
   local focused = mp_state.focused_panel
 
   if focused == "groups" then
-    -- Add child group
     local element = mp_state:get_element_at_cursor()
     local node = element and element.data and element.data.node
 
-    local parent_path = node and node.full_path or ""
-    local title = parent_path ~= "" and ("Add Child to " .. parent_path) or "Add New Group"
+    -- If cursor is on a dir_link, we can't add children to it
+    if node and node.is_dir_link then
+      vim.notify("Cannot add children to a directory link", vim.log.levels.WARN)
+      return
+    end
 
-    dialogs.input(title, "Group Name:", "", function(name)
-      local ok, err = state_module.add_group(parent_path, name)
-      if ok then
-        -- Expand parent to show new child
-        if parent_path ~= "" then
-          local ui_state = state_module.load_ui_state()
-          if not state_module.is_expanded(ui_state, parent_path) then
-            state_module.toggle_expanded(parent_path)
-          end
-        end
-        -- Schedule render to ensure it happens after callback completes
-        vim.schedule(function()
-          if mp_state and mp_state:is_valid() then
-            mp_state:render_panel("groups")
+    local parent_path = node and node.full_path or ""
+
+    -- Show options: Add group or Add directory link
+    local options = { "Add group", "Add directory link" }
+    dialogs.select("Add to " .. (parent_path ~= "" and parent_path or "root"), options, function(idx, choice)
+      if not choice then return end
+
+      if choice == "Add group" then
+        -- Add child group
+        dialogs.input("Add Group", "Group Name:", "", function(name)
+          local ok, err = state_module.add_group(parent_path, name)
+          if ok then
+            -- Expand parent to show new child
+            if parent_path ~= "" then
+              local ui_state = state_module.load_ui_state()
+              if not state_module.is_expanded(ui_state, parent_path) then
+                state_module.toggle_expanded(parent_path)
+              end
+            end
+            vim.schedule(function()
+              if mp_state and mp_state:is_valid() then
+                mp_state:render_panel("groups")
+              end
+            end)
+          else
+            vim.notify(err or "Failed to add group", vim.log.levels.ERROR)
           end
         end)
       else
-        vim.notify(err or "Failed to add group", vim.log.levels.ERROR)
+        -- Add directory link
+        if parent_path == "" then
+          vim.notify("Directory links must be added inside a group", vim.log.levels.WARN)
+          return
+        end
+
+        dialogs.input("Add Directory Link", "Directory Path:", vim.fn.getcwd(), function(dir_path)
+          if not dir_path or dir_path == "" then return end
+
+          -- Default name to directory basename
+          local default_name = vim.fn.fnamemodify(dir_path, ':t')
+          dialogs.input("Add Directory Link", "Display Name:", default_name, function(name)
+            if not name or name == "" then return end
+
+            local ok, err = state_module.add_dir_link(parent_path, name, dir_path)
+            if ok then
+              -- Expand parent to show new dir_link
+              local ui_state = state_module.load_ui_state()
+              if not state_module.is_expanded(ui_state, parent_path) then
+                state_module.toggle_expanded(parent_path)
+              end
+              vim.schedule(function()
+                if mp_state and mp_state:is_valid() then
+                  mp_state:render_panel("groups")
+                end
+              end)
+            else
+              vim.notify(err or "Failed to add directory link", vim.log.levels.ERROR)
+            end
+          end)
+        end)
       end
     end)
   else
@@ -113,19 +157,42 @@ function M.handle_delete(mp_state)
     local node = element.data.node
     if not node then return end
 
-    dialogs.confirm("Delete group '" .. node.name .. "'?", function()
-      local ok, err = state_module.remove_group(node.full_path)
-      if ok then
-        vim.schedule(function()
-          if mp_state and mp_state:is_valid() then
-            mp_state:render_panel("groups")
-            mp_state:render_panel("items")
-          end
-        end)
-      else
-        vim.notify(err or "Failed to delete group", vim.log.levels.ERROR)
-      end
-    end)
+    if node.is_dir_link then
+      -- Delete directory link
+      dialogs.confirm("Remove directory link '" .. node.name .. "'?", function()
+        -- Get parent path from full_path
+        local parts = vim.split(node.full_path, ".", { plain = true })
+        table.remove(parts) -- Remove the dir_link name
+        local parent_path = table.concat(parts, ".")
+
+        local ok, err = state_module.remove_dir_link(parent_path, node.name)
+        if ok then
+          vim.schedule(function()
+            if mp_state and mp_state:is_valid() then
+              mp_state:render_panel("groups")
+              mp_state:render_panel("items")
+            end
+          end)
+        else
+          vim.notify(err or "Failed to remove directory link", vim.log.levels.ERROR)
+        end
+      end)
+    else
+      -- Delete group
+      dialogs.confirm("Delete group '" .. node.name .. "'?", function()
+        local ok, err = state_module.remove_group(node.full_path)
+        if ok then
+          vim.schedule(function()
+            if mp_state and mp_state:is_valid() then
+              mp_state:render_panel("groups")
+              mp_state:render_panel("items")
+            end
+          end)
+        else
+          vim.notify(err or "Failed to delete group", vim.log.levels.ERROR)
+        end
+      end)
+    end
   else
     local item = element.data.item
     local group_path = element.data.group_path
@@ -165,6 +232,12 @@ function M.handle_rename(mp_state)
 
     local node = element.data.node
     if not node then return end
+
+    -- Directory links cannot be renamed (delete and re-add instead)
+    if node.is_dir_link then
+      vim.notify("Cannot rename directory links (use 'd' to remove and 'a' to add)", vim.log.levels.INFO)
+      return
+    end
 
     dialogs.input("Rename Group", "New Name:", node.name, function(new_name)
       if new_name ~= node.name then
@@ -249,6 +322,12 @@ function M.handle_move_group(mp_state)
 
   local node = element.data.node
   if not node then return end
+
+  -- Directory links cannot be moved (delete and re-add instead)
+  if node.is_dir_link then
+    vim.notify("Cannot move directory links (use 'd' to remove and 'a' to add)", vim.log.levels.INFO)
+    return
+  end
 
   local group_path = node.full_path
 

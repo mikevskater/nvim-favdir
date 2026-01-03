@@ -12,11 +12,17 @@ local M = {}
 ---@field type "dir"|"file" Item type
 ---@field order number Sort order within group
 
+---@class FavdirDirLink
+---@field name string Display name in left panel
+---@field path string Absolute directory path
+---@field order number Sort order (shared with children groups)
+
 ---@class FavdirGroup
 ---@field name string Group name
 ---@field items FavdirItem[] Files and directories in this group
 ---@field order number Sort order
 ---@field children FavdirGroup[]? Child groups (for hierarchy)
+---@field dir_links FavdirDirLink[]? Directory links (shown in left panel, load filesystem in right)
 
 ---@class FavdirData
 ---@field groups FavdirGroup[] Top-level groups
@@ -24,6 +30,8 @@ local M = {}
 ---@class FavdirUIState
 ---@field expanded_groups string[] List of expanded group paths (e.g., "Work.Projects")
 ---@field last_selected_group string? Last selected group path
+---@field last_selected_type "group"|"dir_link"? Type of last selected item
+---@field last_selected_dir_link string? Path to selected dir_link's directory
 ---@field focused_panel "left"|"right" Currently focused panel
 ---@field left_cursor {row: number, col: number} Left panel cursor position
 ---@field right_cursor {row: number, col: number} Right panel cursor position
@@ -65,6 +73,7 @@ local function create_default_data()
         items = {},
         order = i,
         children = {},
+        dir_links = {},
       })
     end
   end
@@ -138,6 +147,8 @@ local function create_default_ui_state()
   return {
     expanded_groups = {},
     last_selected_group = nil,
+    last_selected_type = "group",
+    last_selected_dir_link = nil,
     focused_panel = "left",
     left_cursor = { row = 1, col = 0 },
     right_cursor = { row = 1, col = 0 },
