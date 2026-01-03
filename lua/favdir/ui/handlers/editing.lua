@@ -23,7 +23,7 @@ function M.handle_add(mp_state)
     local parent_path = node and node.full_path or ""
     local title = parent_path ~= "" and ("Add Child to " .. parent_path) or "Add New Group"
 
-    dialogs.show_input_popup(title, "Group Name:", "", function(name)
+    dialogs.input(title, "Group Name:", "", function(name)
       local ok, err = state_module.add_group(parent_path, name)
       if ok then
         -- Expand parent to show new child
@@ -54,7 +54,7 @@ function M.handle_add(mp_state)
     end
 
     -- Use nvim-float select popup
-    dialogs.show_select_popup("Add to " .. group_path, { "Current directory", "Current file", "Enter path..." }, function(idx, choice)
+    dialogs.select("Add to " .. group_path, { "Current directory", "Current file", "Enter path..." }, function(idx, choice)
       if not choice then return end
 
       local path
@@ -68,7 +68,7 @@ function M.handle_add(mp_state)
         end
       else
         -- Show input popup for custom path
-        dialogs.show_input_popup("Add Path", "Path:", "", function(input)
+        dialogs.input("Add Path", "Path:", "", function(input)
           local ok, err = state_module.add_item(group_path, input)
           if ok then
             vim.schedule(function()
@@ -113,7 +113,7 @@ function M.handle_delete(mp_state)
     local node = element.data.node
     if not node then return end
 
-    dialogs.show_confirm_popup("Delete group '" .. node.name .. "'?", function()
+    dialogs.confirm("Delete group '" .. node.name .. "'?", function()
       local ok, err = state_module.remove_group(node.full_path)
       if ok then
         vim.schedule(function()
@@ -135,7 +135,7 @@ function M.handle_delete(mp_state)
 
     local name = vim.fn.fnamemodify(item.path, ':t')
 
-    dialogs.show_confirm_popup("Remove '" .. name .. "' from group?", function()
+    dialogs.confirm("Remove '" .. name .. "' from group?", function()
       local ok, err = state_module.remove_item(group_path, index)
       if ok then
         vim.schedule(function()
@@ -166,7 +166,7 @@ function M.handle_rename(mp_state)
     local node = element.data.node
     if not node then return end
 
-    dialogs.show_input_popup("Rename Group", "New Name:", node.name, function(new_name)
+    dialogs.input("Rename Group", "New Name:", node.name, function(new_name)
       if new_name ~= node.name then
         local ok, err = state_module.rename_group(node.full_path, new_name)
         if ok then
@@ -217,7 +217,7 @@ function M.handle_move(mp_state)
     return
   end
 
-  dialogs.show_select_popup("Move to group", groups, function(_, to_group)
+  dialogs.select("Move to group", groups, function(_, to_group)
     if to_group then
       local ok, err = state_module.move_item(from_group, index, to_group)
       if ok then
@@ -288,7 +288,7 @@ function M.handle_move_group(mp_state)
     return
   end
 
-  dialogs.show_select_popup("Move '" .. node.name .. "' to", destinations, function(idx, dest)
+  dialogs.select("Move '" .. node.name .. "' to", destinations, function(idx, dest)
     if dest then
       local new_parent = dest == "(Root Level)" and "" or dest
       local ok, err = state_module.move_group(group_path, new_parent)
