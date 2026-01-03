@@ -208,30 +208,11 @@ function M.render_right_panel(mp_state)
     return cb:build_lines(), cb:build_highlights()
   end
 
-  -- Sort items based on mode
+  -- Sort items by order field (sort mode is applied via state.sort_items which updates order)
   local items = vim.tbl_values(group.items)
-  local sort_mode = ui_state.right_sort_mode or "custom"
-
-  if sort_mode == "alpha" then
-    table.sort(items, function(a, b)
-      local name_a = vim.fn.fnamemodify(a.path, ':t'):lower()
-      local name_b = vim.fn.fnamemodify(b.path, ':t'):lower()
-      return name_a < name_b
-    end)
-  elseif sort_mode == "type" then
-    table.sort(items, function(a, b)
-      if a.type ~= b.type then
-        return a.type == "dir"
-      end
-      local name_a = vim.fn.fnamemodify(a.path, ':t'):lower()
-      local name_b = vim.fn.fnamemodify(b.path, ':t'):lower()
-      return name_a < name_b
-    end)
-  else
-    table.sort(items, function(a, b)
-      return (a.order or 0) < (b.order or 0)
-    end)
-  end
+  table.sort(items, function(a, b)
+    return (a.order or 0) < (b.order or 0)
+  end)
 
   -- Store sorted items for operations that need index
   mp_state._sorted_items = items

@@ -46,16 +46,14 @@ function M.sort_groups(parent_path, mode)
   data_module.save_data(data)
 end
 
----Sort items in a group
+---Sort items in a group (persists order to data file)
 ---@param group_path string Group path
 ---@param mode "custom"|"alpha"|"type"
 function M.sort_items(group_path, mode)
   local data = data_module.load_data()
   local group = groups_module.find_group(data, group_path)
 
-  if not group then
-    return
-  end
+  if not group then return end
 
   if mode == "alpha" then
     table.sort(group.items, function(a, b)
@@ -65,16 +63,12 @@ function M.sort_items(group_path, mode)
     end)
   elseif mode == "type" then
     table.sort(group.items, function(a, b)
-      -- Directories first, then files
-      if a.type ~= b.type then
-        return a.type == "dir"
-      end
+      if a.type ~= b.type then return a.type == "dir" end
       local name_a = vim.fn.fnamemodify(a.path, ':t'):lower()
       local name_b = vim.fn.fnamemodify(b.path, ':t'):lower()
       return name_a < name_b
     end)
   else
-    -- Custom: sort by order
     table.sort(group.items, function(a, b)
       return (a.order or 0) < (b.order or 0)
     end)

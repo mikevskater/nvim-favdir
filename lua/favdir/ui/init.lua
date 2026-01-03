@@ -6,6 +6,7 @@ local M = {}
 
 local state_module = require("favdir.state")
 local icons = require("favdir.ui.icons")
+local dialogs = require("favdir.ui.dialogs")
 local rendering = require("favdir.ui.rendering")
 local handlers = require("favdir.ui.handlers")
 
@@ -29,9 +30,6 @@ function M.show(config)
   end
 
   local nvim_float = require("nvim-float")
-
-  local total_height = math.floor(vim.o.lines * config.window_height_ratio)
-  local total_width = math.floor(vim.o.columns * config.window_width_ratio)
 
   panel_state = nvim_float.create_multi_panel({
     layout = {
@@ -178,9 +176,8 @@ function M.toggle(config)
 end
 
 ---Pick a group and add an item to it
----@param config FavdirConfig
 ---@param item_path string Path to add
-function M.pick_group_and_add_item(config, item_path)
+function M.pick_group_and_add_item(item_path)
   local groups = state_module.get_group_list()
 
   if #groups == 0 then
@@ -188,7 +185,7 @@ function M.pick_group_and_add_item(config, item_path)
     return
   end
 
-  vim.ui.select(groups, { prompt = "Add to group:" }, function(group)
+  dialogs.select("Add to group", groups, function(_, group)
     if group then
       local ok, err = state_module.add_item(group, item_path)
       if not ok then

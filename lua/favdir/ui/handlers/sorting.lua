@@ -35,6 +35,12 @@ function M.handle_sort(mp_state)
     vim.notify("Groups sorted: " .. next_mode, vim.log.levels.INFO)
     mp_state:render_panel("groups")
   else
+    local group_path = ui_state.last_selected_group
+    if not group_path then
+      vim.notify("Select a group first", vim.log.levels.WARN)
+      return
+    end
+
     local modes = { "custom", "alpha", "type" }
     local current = ui_state.right_sort_mode or "custom"
     local idx = 1
@@ -47,6 +53,9 @@ function M.handle_sort(mp_state)
     local next_mode = modes[(idx % #modes) + 1]
     ui_state.right_sort_mode = next_mode
     state_module.save_ui_state(ui_state)
+
+    -- Persist sort order to data file
+    state_module.sort_items(group_path, next_mode)
 
     vim.notify("Items sorted: " .. next_mode, vim.log.levels.INFO)
     mp_state:render_panel("items")
