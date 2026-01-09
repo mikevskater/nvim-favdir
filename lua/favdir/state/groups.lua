@@ -6,6 +6,7 @@ local M = {}
 local data_module = require("favdir.state.data")
 local logger = require("favdir.logger")
 local utils = require("favdir.state.utils")
+local path_utils = require("favdir.path_utils")
 
 -- ============================================================================
 -- Group Lookup
@@ -20,7 +21,7 @@ function M.find_group(data, group_path)
     return nil, nil
   end
 
-  local parts = vim.split(group_path, ".", { plain = true })
+  local parts = path_utils.split(group_path)
   local current_list = data.groups
   local group = nil
 
@@ -42,7 +43,7 @@ function M.find_group(data, group_path)
   if #parts == 1 then
     return group, data.groups
   else
-    local parent_path = table.concat(vim.list_slice(parts, 1, #parts - 1), ".")
+    local parent_path = path_utils.get_parent_path(group_path)
     local parent = M.find_group(data, parent_path)
     if parent then
       return group, parent.children
@@ -187,24 +188,12 @@ function M.rename_group(group_path, new_name)
 
   -- Update UI state expanded_groups paths
   local ui_state = data_module.load_ui_state()
-  local new_expanded = {}
-  for _, path in ipairs(ui_state.expanded_groups) do
-    if path == group_path then
-      -- Replace this exact path
-      local parts = vim.split(group_path, ".", { plain = true })
-      parts[#parts] = new_name
-      table.insert(new_expanded, table.concat(parts, "."))
-    elseif vim.startswith(path, group_path .. ".") then
-      -- Replace prefix for child paths
-      local suffix = path:sub(#group_path + 2)
-      local parts = vim.split(group_path, ".", { plain = true })
-      parts[#parts] = new_name
-      table.insert(new_expanded, table.concat(parts, ".") .. "." .. suffix)
-    else
-      table.insert(new_expanded, path)
-    end
-  end
-  ui_state.expanded_groups = new_expanded
+  local new_path = path_utils.rename_last_segment(group_path, new_name)
+  ui_state.expanded_groups = path_utils.update_paths_after_rename(
+    ui_state.expanded_groups,
+    group_path,
+    new_path
+  )
   data_module.save_ui_state(ui_state)
 
   data_module.save_data(data)
@@ -417,13 +406,13 @@ function M.find_dir_link(data, link_path)
     return nil, nil
   end
 
-  local parts = vim.split(link_path, ".", { plain = true })
-  if #parts < 2 then
+  local depth = path_utils.get_depth(link_path)
+  if depth < 2 then
     return nil, nil
   end
 
-  local parent_path = table.concat(vim.list_slice(parts, 1, #parts - 1), ".")
-  local link_name = parts[#parts]
+  local parent_path = path_utils.get_parent_path(link_path)
+  local link_name = path_utils.get_name(link_path)
 
   local parent = M.find_group(data, parent_path)
   if not parent or not parent.dir_links then

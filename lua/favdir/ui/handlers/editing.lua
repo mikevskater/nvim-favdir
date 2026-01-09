@@ -7,6 +7,7 @@ local state_module = require("favdir.state")
 local dialogs = require("favdir.ui.dialogs")
 local utils = require("favdir.ui.handlers.utils")
 local logger = require("favdir.logger")
+local path_utils = require("favdir.path_utils")
 
 -- ============================================================================
 -- Add Handlers
@@ -170,9 +171,7 @@ function M.handle_delete(mp_state)
       -- Delete directory link
       dialogs.confirm("Remove directory link '" .. node.name .. "'?", function()
         -- Get parent path from full_path
-        local parts = vim.split(node.full_path, ".", { plain = true })
-        table.remove(parts) -- Remove the dir_link name
-        local parent_path = table.concat(parts, ".")
+        local parent_path = path_utils.get_parent_path(node.full_path)
 
         local ok, err = state_module.remove_dir_link(parent_path, node.name)
         if ok then
@@ -347,12 +346,7 @@ function M.handle_move_group(mp_state)
   -- 1. The group itself
   -- 2. Any children of the group (would create circular reference)
   -- 3. The current parent (no point moving to same location)
-  local current_parent = ""
-  local parts = vim.split(group_path, ".", { plain = true })
-  if #parts > 1 then
-    table.remove(parts)
-    current_parent = table.concat(parts, ".")
-  end
+  local current_parent = path_utils.get_parent_path(group_path)
 
   local destinations = {}
 

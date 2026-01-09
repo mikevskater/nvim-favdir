@@ -6,6 +6,7 @@ local M = {}
 local state_module = require("favdir.state")
 local utils = require("favdir.ui.handlers.utils")
 local logger = require("favdir.logger")
+local path_utils = require("favdir.path_utils")
 
 -- ============================================================================
 -- Sort Handler
@@ -176,8 +177,7 @@ function M.handle_move_up(mp_state)
     if not node then return end
 
     -- Get parent path
-    local parts = vim.split(node.full_path, ".", { plain = true })
-    local parent_path = #parts > 1 and table.concat(vim.list_slice(parts, 1, #parts - 1), ".") or ""
+    local parent_path = path_utils.get_parent_path(node.full_path)
 
     -- Find index in parent's children (using current sorted order)
     local data = state_module.load_data()
@@ -254,8 +254,7 @@ function M.handle_move_down(mp_state)
     local node = element.data.node
     if not node then return end
 
-    local parts = vim.split(node.full_path, ".", { plain = true })
-    local parent_path = #parts > 1 and table.concat(vim.list_slice(parts, 1, #parts - 1), ".") or ""
+    local parent_path = path_utils.get_parent_path(node.full_path)
 
     local data = state_module.load_data()
     local parent_list = parent_path == "" and data.groups or (state_module.find_group(data, parent_path) or {}).children or {}
