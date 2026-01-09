@@ -46,6 +46,7 @@ local function build_controls(keys)
       header = "Sorting",
       keys = {
         { key = keys.sort, desc = "Cycle sort mode" },
+        { key = keys.sort_order, desc = "Toggle asc/desc" },
         { key = keys.reorder_up .. "/" .. keys.reorder_down, desc = "Reorder up/down" },
       },
     },
@@ -99,6 +100,7 @@ local function build_keymaps(keys, ps)
     [keys.move] = function() handlers.handle_move(ps) end,
     [keys.move_group] = function() handlers.handle_move_group(ps) end,
     [keys.sort] = function() handlers.handle_sort(ps) end,
+    [keys.sort_order] = function() handlers.handle_sort_order(ps) end,
     [keys.reorder_up] = function() handlers.handle_move_up(ps) end,
     [keys.reorder_down] = function() handlers.handle_move_down(ps) end,
     [keys.open_split] = function() handlers.handle_open_split(ps, "split") end,
@@ -155,6 +157,18 @@ function M.show(config)
   if not panel_state then
     vim.notify("Failed to create favorites UI", vim.log.levels.ERROR)
     return
+  end
+
+  -- Ensure a group is selected if none is (auto-select first group)
+  local ui_state = state_module.load_ui_state()
+  if not ui_state.last_selected_group and not ui_state.last_selected_dir_link then
+    -- No selection - try to auto-select first available group
+    local data = state_module.load_data()
+    if data.groups and #data.groups > 0 then
+      ui_state.last_selected_type = "group"
+      ui_state.last_selected_group = data.groups[1].name
+      state_module.save_ui_state(ui_state)
+    end
   end
 
   -- Render initial content

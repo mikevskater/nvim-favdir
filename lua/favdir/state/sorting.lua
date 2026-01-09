@@ -86,6 +86,56 @@ end
 -- Reordering Functions
 -- ============================================================================
 
+---Freeze current groups sort order as custom order (saves current display order as new order values)
+---This recursively processes all groups at all levels
+function M.freeze_groups_order()
+  local data = data_module.load_data()
+  local ui_state = data_module.load_ui_state()
+  local left_sort_asc = ui_state.left_sort_asc ~= false
+
+  local function freeze_level(groups)
+    if not groups or #groups == 0 then return end
+
+    -- Sort according to current mode
+    if ui_state.left_sort_mode == "alpha" then
+      table.sort(groups, function(a, b)
+        local result = a.name:lower() < b.name:lower()
+        if not left_sort_asc then
+          return not result
+        end
+        return result
+      end)
+    else
+      -- Custom mode - sort by existing order
+      table.sort(groups, function(a, b)
+        local result = (a.order or 0) < (b.order or 0)
+        if not left_sort_asc then
+          return not result
+        end
+        return result
+      end)
+    end
+
+    -- Assign new order values based on current position
+    for i, group in ipairs(groups) do
+      group.order = i
+      -- Recursively process children
+      if group.children then
+        freeze_level(group.children)
+      end
+      -- Also process dir_links order
+      if group.dir_links then
+        for j, dl in ipairs(group.dir_links) do
+          dl.order = j
+        end
+      end
+    end
+  end
+
+  freeze_level(data.groups)
+  data_module.save_data(data)
+end
+
 ---Reorder an item up
 ---@param item_type "group"|"item"
 ---@param path string Group path (for items) or group's parent path (for groups)

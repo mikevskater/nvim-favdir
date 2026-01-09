@@ -40,7 +40,11 @@ local M = {}
 ---@field left_cursor {row: number, col: number} Left panel cursor position
 ---@field right_cursor {row: number, col: number} Right panel cursor position
 ---@field left_sort_mode "custom"|"alpha" Left panel sort mode
----@field right_sort_mode "custom"|"alpha"|"type" Right panel sort mode
+---@field right_sort_mode "custom"|"name"|"created"|"modified"|"size"|"type" Right panel sort mode
+---@field dir_sort_mode "name"|"created"|"modified"|"size"|"type" Directory view sort mode
+---@field left_sort_asc boolean Left panel sort ascending (true) or descending (false)
+---@field right_sort_asc boolean Right panel sort ascending
+---@field dir_sort_asc boolean Directory view sort ascending
 
 -- ============================================================================
 -- Module State
@@ -162,6 +166,10 @@ local function create_default_ui_state()
     right_cursor = { row = 1, col = 0 },
     left_sort_mode = "custom",
     right_sort_mode = "custom",
+    dir_sort_mode = "type",
+    left_sort_asc = true,
+    right_sort_asc = true,
+    dir_sort_asc = true,
   }
 end
 

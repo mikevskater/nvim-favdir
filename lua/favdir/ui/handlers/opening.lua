@@ -3,6 +3,8 @@
 
 local M = {}
 
+local utils = require("favdir.ui.handlers.utils")
+
 -- ============================================================================
 -- Open in Split Handler
 -- ============================================================================
@@ -11,7 +13,7 @@ local M = {}
 ---@param mp_state MultiPanelState
 ---@param split_cmd string "split" or "vsplit" or "tabnew"
 function M.handle_open_split(mp_state, split_cmd)
-  if mp_state.focused_panel ~= "items" then
+  if utils.get_focused_panel(mp_state) ~= "items" then
     vim.notify("Select an item in the right panel", vim.log.levels.INFO)
     return
   end

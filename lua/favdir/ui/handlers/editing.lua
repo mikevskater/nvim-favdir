@@ -5,6 +5,7 @@ local M = {}
 
 local state_module = require("favdir.state")
 local dialogs = require("favdir.ui.dialogs")
+local utils = require("favdir.ui.handlers.utils")
 
 -- ============================================================================
 -- Add Handlers
@@ -13,7 +14,7 @@ local dialogs = require("favdir.ui.dialogs")
 ---Handle Add key
 ---@param mp_state MultiPanelState
 function M.handle_add(mp_state)
-  local focused = mp_state.focused_panel
+  local focused = utils.get_focused_panel(mp_state)
 
   if focused == "groups" then
     local element = mp_state:get_element_at_cursor()
@@ -89,8 +90,15 @@ function M.handle_add(mp_state)
     end)
   else
     -- Add item to current group
-    local ui_state = state_module.load_ui_state()
-    local group_path = ui_state.last_selected_group
+    -- Try to get group_path from element data first, then fallback to ui_state
+    local group_path = nil
+    local element = mp_state:get_element_at_cursor()
+    if element and element.data and element.data.group_path then
+      group_path = element.data.group_path
+    else
+      local ui_state = state_module.load_ui_state()
+      group_path = ui_state.last_selected_group
+    end
 
     if not group_path then
       vim.notify("Select a group first", vim.log.levels.WARN)
@@ -148,7 +156,7 @@ end
 ---Handle Delete key
 ---@param mp_state MultiPanelState
 function M.handle_delete(mp_state)
-  local focused = mp_state.focused_panel
+  local focused = utils.get_focused_panel(mp_state)
   local element = mp_state:get_element_at_cursor()
 
   if not element or not element.data then return end
@@ -224,7 +232,7 @@ end
 ---Handle Rename key
 ---@param mp_state MultiPanelState
 function M.handle_rename(mp_state)
-  local focused = mp_state.focused_panel
+  local focused = utils.get_focused_panel(mp_state)
 
   if focused == "groups" then
     local element = mp_state:get_element_at_cursor()
@@ -265,7 +273,7 @@ end
 ---Handle Move key (for items)
 ---@param mp_state MultiPanelState
 function M.handle_move(mp_state)
-  local focused = mp_state.focused_panel
+  local focused = utils.get_focused_panel(mp_state)
 
   if focused ~= "items" then
     vim.notify("Move only works for items", vim.log.levels.INFO)
@@ -310,7 +318,7 @@ end
 ---Handle Move Group key (move group to different parent)
 ---@param mp_state MultiPanelState
 function M.handle_move_group(mp_state)
-  local focused = mp_state.focused_panel
+  local focused = utils.get_focused_panel(mp_state)
 
   if focused ~= "groups" then
     vim.notify("Use 'm' to move items", vim.log.levels.INFO)

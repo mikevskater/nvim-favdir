@@ -4,6 +4,7 @@
 local M = {}
 
 local state_module = require("favdir.state")
+local utils = require("favdir.ui.handlers.utils")
 
 -- ============================================================================
 -- Navigation Handlers
@@ -12,7 +13,7 @@ local state_module = require("favdir.state")
 ---Handle toggle expand/collapse
 ---@param mp_state MultiPanelState
 function M.handle_toggle_expand(mp_state)
-  local focused = mp_state.focused_panel
+  local focused = utils.get_focused_panel(mp_state)
 
   if focused ~= "groups" then
     return
@@ -39,10 +40,49 @@ function M.handle_toggle_expand(mp_state)
   end
 end
 
----Handle Enter key - uses interact_at_cursor for element-based interaction
+---Handle Enter key - select group on left panel, interact on right panel
 ---@param mp_state MultiPanelState
 function M.handle_enter(mp_state)
-  mp_state:interact_at_cursor()
+  local focused = utils.get_focused_panel(mp_state)
+
+  if focused == "groups" then
+    -- Explicitly select the group/dir_link under cursor
+    local element = mp_state:get_element_at_cursor()
+    if not element or not element.data then return end
+
+    local node = element.data.node
+    if not node then return end
+
+    local ui_state = state_module.load_ui_state()
+
+    -- Reset browse state when selecting anything on left panel
+    ui_state.is_browsing_directory = false
+    ui_state.browse_base_path = nil
+    ui_state.browse_current_path = nil
+
+    if node.is_dir_link then
+      -- Select this dir_link
+      ui_state.last_selected_type = "dir_link"
+      ui_state.last_selected_dir_link = node.dir_path
+      ui_state.dir_link_current_path = nil
+      ui_state.last_selected_group = nil
+    else
+      -- Select this group
+      ui_state.last_selected_type = "group"
+      ui_state.last_selected_group = node.full_path
+      ui_state.last_selected_dir_link = nil
+      ui_state.dir_link_current_path = nil
+    end
+
+    state_module.save_ui_state(ui_state)
+
+    -- Refresh both panels
+    mp_state:render_panel("groups")
+    mp_state:render_panel("items")
+  else
+    -- On items panel, use interact_at_cursor to open file/dir
+    mp_state:interact_at_cursor()
+  end
 end
 
 -- ============================================================================
@@ -53,7 +93,7 @@ end
 ---Works for both dir_link views and regular group directory items
 ---@param mp_state MultiPanelState
 function M.handle_browse_folder(mp_state)
-  local focused = mp_state.focused_panel
+  local focused = utils.get_focused_panel(mp_state)
 
   -- Only works on items panel
   if focused ~= "items" then
@@ -104,7 +144,7 @@ end
 ---Handle go up (backspace) - go up one folder level when browsing directories
 ---@param mp_state MultiPanelState
 function M.handle_go_up(mp_state)
-  local focused = mp_state.focused_panel
+  local focused = utils.get_focused_panel(mp_state)
 
   -- Only works on items panel when in browse mode
   if focused ~= "items" or not mp_state._is_dir_link_view then

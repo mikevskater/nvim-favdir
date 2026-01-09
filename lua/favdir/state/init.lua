@@ -61,6 +61,7 @@ M.sort_groups = sorting_module.sort_groups
 M.sort_items = sorting_module.sort_items
 M.reorder_up = sorting_module.reorder_up
 M.reorder_down = sorting_module.reorder_down
+M.freeze_groups_order = sorting_module.freeze_groups_order
 
 -- ============================================================================
 -- UI State Helpers

@@ -33,6 +33,7 @@ M.handle_move_group = editing.handle_move_group
 -- ============================================================================
 
 M.handle_sort = sorting.handle_sort
+M.handle_sort_order = sorting.handle_sort_order
 M.handle_move_up = sorting.handle_move_up
 M.handle_move_down = sorting.handle_move_down
 

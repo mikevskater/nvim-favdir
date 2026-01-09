@@ -23,6 +23,7 @@ local ui = require("favdir.ui")
 ---@field move string Move item to group
 ---@field move_group string Move group to parent
 ---@field sort string Cycle sort mode
+---@field sort_order string Toggle sort order (asc/desc)
 ---@field reorder_up string Reorder up
 ---@field reorder_down string Reorder down
 ---@field open_split string Open in split
@@ -69,6 +70,7 @@ M.config = {
     move_group = "M",
     -- Sorting
     sort = "s",
+    sort_order = "S",
     reorder_up = "<C-k>",
     reorder_down = "<C-j>",
     -- Open options

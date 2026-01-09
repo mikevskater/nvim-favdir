@@ -32,12 +32,17 @@ local icons = require("favdir.ui.icons")
 ---@return TreeNode[]
 function M.build_tree(data, ui_state)
   local nodes = {}
+  local left_sort_asc = ui_state.left_sort_asc ~= false -- default to true
 
   local function collect(groups, prefix, level)
     -- Sort by order
     local sorted = vim.tbl_values(groups)
     table.sort(sorted, function(a, b)
-      return (a.order or 0) < (b.order or 0)
+      local result = (a.order or 0) < (b.order or 0)
+      if not left_sort_asc then
+        return not result
+      end
+      return result
     end)
 
     for _, group in ipairs(sorted) do
@@ -78,7 +83,11 @@ function M.build_tree(data, ui_state)
 
         -- Sort by order
         table.sort(child_items, function(a, b)
-          return a.order < b.order
+          local result = a.order < b.order
+          if not left_sort_asc then
+            return not result
+          end
+          return result
         end)
 
         for _, child_item in ipairs(child_items) do
@@ -311,10 +320,57 @@ function M.render_right_panel(mp_state)
     return cb:build_lines(), cb:build_highlights()
   end
 
-  -- Sort items by order field (sort mode is applied via state.sort_items which updates order)
+  -- Sort items based on right_sort_mode
   local items = vim.tbl_values(group.items)
+  local sort_mode = ui_state.right_sort_mode or "custom"
+  local sort_asc = ui_state.right_sort_asc ~= false -- default to true
   table.sort(items, function(a, b)
-    return (a.order or 0) < (b.order or 0)
+    local result
+    if sort_mode == "custom" then
+      -- Use order field for manual sorting
+      result = (a.order or 0) < (b.order or 0)
+    elseif sort_mode == "name" then
+      -- Alphabetical by filename
+      local name_a = vim.fn.fnamemodify(a.path, ':t'):lower()
+      local name_b = vim.fn.fnamemodify(b.path, ':t'):lower()
+      result = name_a < name_b
+    elseif sort_mode == "created" then
+      -- By creation time (newest first by default)
+      local stat_a = vim.loop.fs_stat(a.path)
+      local stat_b = vim.loop.fs_stat(b.path)
+      local ctime_a = stat_a and stat_a.birthtime and stat_a.birthtime.sec or 0
+      local ctime_b = stat_b and stat_b.birthtime and stat_b.birthtime.sec or 0
+      result = ctime_a > ctime_b
+    elseif sort_mode == "modified" then
+      -- By modification time (newest first by default)
+      local stat_a = vim.loop.fs_stat(a.path)
+      local stat_b = vim.loop.fs_stat(b.path)
+      local mtime_a = stat_a and stat_a.mtime and stat_a.mtime.sec or 0
+      local mtime_b = stat_b and stat_b.mtime and stat_b.mtime.sec or 0
+      result = mtime_a > mtime_b
+    elseif sort_mode == "size" then
+      -- By size (largest first by default, dirs treated as 0)
+      local stat_a = vim.loop.fs_stat(a.path)
+      local stat_b = vim.loop.fs_stat(b.path)
+      local size_a = (stat_a and a.type == "file") and stat_a.size or 0
+      local size_b = (stat_b and b.type == "file") and stat_b.size or 0
+      result = size_a > size_b
+    else
+      -- "type": directories first, then files, alphabetically within each
+      if a.type ~= b.type then
+        result = a.type == "dir"
+      else
+        local name_a = vim.fn.fnamemodify(a.path, ':t'):lower()
+        local name_b = vim.fn.fnamemodify(b.path, ':t'):lower()
+        result = name_a < name_b
+      end
+    end
+
+    -- Reverse if descending
+    if not sort_asc then
+      return not result
+    end
+    return result
   end)
 
   -- Store sorted items for operations that need index
@@ -437,14 +493,53 @@ function M.render_dir_link_contents(mp_state, cb, base_path, current_path)
     })
   end
 
-  -- Sort: parent first, then directories, then files alphabetically
+  -- Sort based on dir_sort_mode (parent ".." always first)
+  local sort_mode = ui_state.dir_sort_mode or "type"
+  local sort_asc = ui_state.dir_sort_asc ~= false -- default to true
   table.sort(items, function(a, b)
+    -- Parent entry always comes first
     if a.type == "parent" then return true end
     if b.type == "parent" then return false end
-    if a.type ~= b.type then
-      return a.type == "dir"
+
+    local result
+    if sort_mode == "name" then
+      -- Alphabetical by name
+      result = a.name:lower() < b.name:lower()
+    elseif sort_mode == "created" then
+      -- By creation time (newest first by default)
+      local stat_a = vim.loop.fs_stat(a.path)
+      local stat_b = vim.loop.fs_stat(b.path)
+      local ctime_a = stat_a and stat_a.birthtime and stat_a.birthtime.sec or 0
+      local ctime_b = stat_b and stat_b.birthtime and stat_b.birthtime.sec or 0
+      result = ctime_a > ctime_b
+    elseif sort_mode == "modified" then
+      -- By modification time (newest first by default)
+      local stat_a = vim.loop.fs_stat(a.path)
+      local stat_b = vim.loop.fs_stat(b.path)
+      local mtime_a = stat_a and stat_a.mtime and stat_a.mtime.sec or 0
+      local mtime_b = stat_b and stat_b.mtime and stat_b.mtime.sec or 0
+      result = mtime_a > mtime_b
+    elseif sort_mode == "size" then
+      -- By size (largest first by default, dirs treated as 0)
+      local stat_a = vim.loop.fs_stat(a.path)
+      local stat_b = vim.loop.fs_stat(b.path)
+      local size_a = (stat_a and a.type == "file") and stat_a.size or 0
+      local size_b = (stat_b and b.type == "file") and stat_b.size or 0
+      result = size_a > size_b
+    else
+      -- "type" (default): directories first, then files, alphabetically within each
+      if a.type ~= b.type then
+        result = a.type == "dir"
+      else
+        result = a.name:lower() < b.name:lower()
+      end
     end
-    return a.name:lower() < b.name:lower()
+
+    -- Reverse if descending
+    if not sort_asc then
+      return not result
+    end
+    return result
   end)
 
   -- Store for operations
