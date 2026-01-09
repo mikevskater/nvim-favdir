@@ -10,6 +10,7 @@ local dialogs = require("favdir.ui.dialogs")
 local rendering = require("favdir.ui.rendering")
 local handlers = require("favdir.ui.handlers")
 local logger = require("favdir.logger")
+local constants = require("favdir.constants")
 
 ---@type MultiPanelState?
 local panel_state = nil
@@ -168,7 +169,7 @@ function M.show(config)
     -- No selection - try to auto-select first available group
     local data = state_module.load_data()
     if data.groups and #data.groups > 0 then
-      ui_state.last_selected_type = "group"
+      ui_state.last_selected_type = constants.SELECTION_TYPE.GROUP
       ui_state.last_selected_group = data.groups[1].name
       state_module.save_ui_state(ui_state)
     end

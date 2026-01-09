@@ -4,6 +4,7 @@
 local M = {}
 
 local logger = require("favdir.logger")
+local constants = require("favdir.constants")
 
 -- ============================================================================
 -- Data Structures (Type Definitions)
@@ -160,7 +161,7 @@ local function create_default_ui_state()
   return {
     expanded_groups = {},
     last_selected_group = nil,
-    last_selected_type = "group",
+    last_selected_type = constants.SELECTION_TYPE.GROUP,
     last_selected_dir_link = nil,
     dir_link_current_path = nil,
     is_browsing_directory = false,
@@ -169,12 +170,12 @@ local function create_default_ui_state()
     focused_panel = "left",
     left_cursor = { row = 1, col = 0 },
     right_cursor = { row = 1, col = 0 },
-    left_sort_mode = "custom",
-    right_sort_mode = "custom",
-    dir_sort_mode = "type",
-    left_sort_asc = true,
-    right_sort_asc = true,
-    dir_sort_asc = true,
+    left_sort_mode = constants.DEFAULTS.LEFT_SORT_MODE,
+    right_sort_mode = constants.DEFAULTS.RIGHT_SORT_MODE,
+    dir_sort_mode = constants.DEFAULTS.DIR_SORT_MODE,
+    left_sort_asc = constants.DEFAULTS.SORT_ASCENDING,
+    right_sort_asc = constants.DEFAULTS.SORT_ASCENDING,
+    dir_sort_asc = constants.DEFAULTS.SORT_ASCENDING,
   }
 end
 

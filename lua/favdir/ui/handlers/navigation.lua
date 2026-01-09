@@ -6,6 +6,7 @@ local M = {}
 local state_module = require("favdir.state")
 local utils = require("favdir.ui.handlers.utils")
 local logger = require("favdir.logger")
+local constants = require("favdir.constants")
 
 -- ============================================================================
 -- Navigation Handlers
@@ -63,13 +64,13 @@ function M.handle_enter(mp_state)
 
     if node.is_dir_link then
       -- Select this dir_link
-      ui_state.last_selected_type = "dir_link"
+      ui_state.last_selected_type = constants.SELECTION_TYPE.DIR_LINK
       ui_state.last_selected_dir_link = node.dir_path
       ui_state.dir_link_current_path = nil
       ui_state.last_selected_group = nil
     else
       -- Select this group
-      ui_state.last_selected_type = "group"
+      ui_state.last_selected_type = constants.SELECTION_TYPE.GROUP
       ui_state.last_selected_group = node.full_path
       ui_state.last_selected_dir_link = nil
       ui_state.dir_link_current_path = nil
@@ -112,7 +113,7 @@ function M.handle_browse_folder(mp_state)
   end
 
   -- Only browse directories (including parent "..")
-  if item.type ~= "dir" and item.type ~= "parent" then
+  if item.type ~= constants.ITEM_TYPE.DIR and item.type ~= constants.ITEM_TYPE.PARENT then
     logger.info("Not a directory")
     return
   end

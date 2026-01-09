@@ -7,6 +7,7 @@ local state_module = require("favdir.state")
 local icons = require("favdir.ui.icons")
 local logger = require("favdir.logger")
 local sort_comparators = require("favdir.state.sort_comparators")
+local constants = require("favdir.constants")
 
 -- ============================================================================
 -- Type Definitions
@@ -67,13 +68,13 @@ function M.build_tree(data, ui_state)
 
         if group.children then
           for _, child in ipairs(group.children) do
-            table.insert(child_items, { type = "group", item = child, order = child.order or 0 })
+            table.insert(child_items, { type = constants.ITEM_TYPE.GROUP, item = child, order = child.order or 0 })
           end
         end
 
         if group.dir_links then
           for _, link in ipairs(group.dir_links) do
-            table.insert(child_items, { type = "dir_link", item = link, order = link.order or 0 })
+            table.insert(child_items, { type = constants.ITEM_TYPE.DIR_LINK, item = link, order = link.order or 0 })
           end
         end
 
@@ -81,7 +82,7 @@ function M.build_tree(data, ui_state)
         table.sort(child_items, sort_comparators.mixed_children_comparator(left_sort_asc))
 
         for _, child_item in ipairs(child_items) do
-          if child_item.type == "group" then
+          if child_item.type == constants.ITEM_TYPE.GROUP then
             -- Recursively collect this group
             collect({ child_item.item }, path, level + 1)
           else
@@ -132,13 +133,13 @@ function M.on_group_interact(element, mp_state)
 
   if node.is_dir_link then
     -- Select this dir_link (reset navigation to base path)
-    ui_state.last_selected_type = "dir_link"
+    ui_state.last_selected_type = constants.SELECTION_TYPE.DIR_LINK
     ui_state.last_selected_dir_link = node.dir_path
     ui_state.dir_link_current_path = nil -- Reset to base path
     ui_state.last_selected_group = nil
   else
     -- Select this group (don't toggle - that's handled by 'o' key)
-    ui_state.last_selected_type = "group"
+    ui_state.last_selected_type = constants.SELECTION_TYPE.GROUP
     ui_state.last_selected_group = node.full_path
     ui_state.last_selected_dir_link = nil
     ui_state.dir_link_current_path = nil
@@ -161,7 +162,7 @@ function M.on_item_interact(element, mp_state)
   if not item then return end
 
   -- Handle "../" parent entry - trigger go up navigation instead of opening
-  if item.type == "parent" then
+  if item.type == constants.ITEM_TYPE.PARENT then
     local navigation = require("favdir.ui.handlers.navigation")
     navigation.handle_go_up(mp_state)
     return
@@ -170,7 +171,7 @@ function M.on_item_interact(element, mp_state)
   -- Close the UI first
   mp_state:close()
 
-  if item.type == "dir" then
+  if item.type == constants.ITEM_TYPE.DIR then
     vim.cmd.cd(item.path)
     logger.info("Changed to: %s", item.path)
   else
@@ -220,9 +221,9 @@ function M.render_left_panel(mp_state)
     -- Check if this is the selected item (group or dir_link)
     local is_selected = false
     if node.is_dir_link then
-      is_selected = (ui_state.last_selected_type == "dir_link" and ui_state.last_selected_dir_link == node.dir_path)
+      is_selected = (ui_state.last_selected_type == constants.SELECTION_TYPE.DIR_LINK and ui_state.last_selected_dir_link == node.dir_path)
     else
-      is_selected = (ui_state.last_selected_type == "group" and ui_state.last_selected_group == node.full_path)
+      is_selected = (ui_state.last_selected_type == constants.SELECTION_TYPE.GROUP and ui_state.last_selected_group == node.full_path)
         or (ui_state.last_selected_type == nil and ui_state.last_selected_group == node.full_path)
     end
 
@@ -272,7 +273,7 @@ function M.render_right_panel(mp_state)
   end
 
   -- Check if a dir_link is selected
-  if ui_state.last_selected_type == "dir_link" and ui_state.last_selected_dir_link then
+  if ui_state.last_selected_type == constants.SELECTION_TYPE.DIR_LINK and ui_state.last_selected_dir_link then
     local base_path = ui_state.last_selected_dir_link
     local current_path = ui_state.dir_link_current_path or base_path
     return M.render_dir_link_contents(mp_state, cb, base_path, current_path)
@@ -321,7 +322,7 @@ function M.render_right_panel(mp_state)
 
   for idx, item in ipairs(items) do
     local icon, color
-    if item.type == "dir" then
+    if item.type == constants.ITEM_TYPE.DIR then
       icon = icons.get_base_icon("directory")
       color = icons.get_directory_color()
     else
@@ -353,14 +354,14 @@ function M.render_right_panel(mp_state)
             item = item,
             index = idx,
             group_path = group_path,
-            panel = "items",
+            panel = constants.PANEL.ITEMS,
           },
           on_interact = function(element)
             M.on_item_interact(element, mp_state)
           end,
         },
       },
-      { text = name, style = item.type == "dir" and "strong" or nil },
+      { text = name, style = item.type == constants.ITEM_TYPE.DIR and "strong" or nil },
       { text = " ", style = "muted" },
       { text = display_path, style = "muted" },
     })
@@ -422,7 +423,7 @@ function M.render_dir_link_contents(mp_state, cb, base_path, current_path)
     table.insert(items, {
       name = "..",
       path = vim.fn.fnamemodify(current_path, ':h'),
-      type = "parent",
+      type = constants.ITEM_TYPE.PARENT,
     })
   end
 
@@ -432,7 +433,7 @@ function M.render_dir_link_contents(mp_state, cb, base_path, current_path)
     table.insert(items, {
       name = entry,
       path = full_path,
-      type = is_dir and "dir" or "file",
+      type = is_dir and constants.ITEM_TYPE.DIR or constants.ITEM_TYPE.FILE,
     })
   end
 
@@ -454,10 +455,10 @@ function M.render_dir_link_contents(mp_state, cb, base_path, current_path)
 
   for _, item in ipairs(items) do
     local icon, color
-    if item.type == "parent" then
+    if item.type == constants.ITEM_TYPE.PARENT then
       icon = icons.get_base_icon("collapsed")
       color = nil
-    elseif item.type == "dir" then
+    elseif item.type == constants.ITEM_TYPE.DIR then
       icon = icons.get_base_icon("directory")
       color = icons.get_directory_color()
     else
@@ -478,7 +479,7 @@ function M.render_dir_link_contents(mp_state, cb, base_path, current_path)
           hover_style = "emphasis",
           data = {
             item = item,
-            panel = "items",
+            panel = constants.PANEL.ITEMS,
             is_dir_link_view = true,
             base_path = base_path,
           },
@@ -487,7 +488,7 @@ function M.render_dir_link_contents(mp_state, cb, base_path, current_path)
           end,
         },
       },
-      { text = item.name, style = (item.type == "dir" or item.type == "parent") and "strong" or nil },
+      { text = item.name, style = (item.type == constants.ITEM_TYPE.DIR or item.type == constants.ITEM_TYPE.PARENT) and "strong" or nil },
     })
   end
 

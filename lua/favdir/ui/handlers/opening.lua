@@ -5,6 +5,7 @@ local M = {}
 
 local utils = require("favdir.ui.handlers.utils")
 local logger = require("favdir.logger")
+local constants = require("favdir.constants")
 
 -- ============================================================================
 -- Open in Split Handler
@@ -28,7 +29,7 @@ function M.handle_open_split(mp_state, split_cmd)
   mp_state:close()
 
   vim.cmd(split_cmd)
-  if item.type == "dir" then
+  if item.type == constants.ITEM_TYPE.DIR then
     vim.cmd.cd(item.path)
   else
     vim.cmd.edit(item.path)

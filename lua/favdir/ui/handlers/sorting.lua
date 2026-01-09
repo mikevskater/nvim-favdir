@@ -7,6 +7,7 @@ local state_module = require("favdir.state")
 local utils = require("favdir.ui.handlers.utils")
 local logger = require("favdir.logger")
 local path_utils = require("favdir.path_utils")
+local constants = require("favdir.constants")
 
 -- ============================================================================
 -- Sort Handler
@@ -18,9 +19,9 @@ function M.handle_sort(mp_state)
   local focused = utils.get_focused_panel(mp_state)
   local ui_state = state_module.load_ui_state()
 
-  if focused == "groups" then
-    local modes = { "custom", "alpha" }
-    local current = ui_state.left_sort_mode or "custom"
+  if focused == constants.PANEL.GROUPS then
+    local modes = constants.LEFT_SORT_MODES
+    local current = ui_state.left_sort_mode or constants.DEFAULTS.LEFT_SORT_MODE
     local idx = 1
     for i, m in ipairs(modes) do
       if m == current then
@@ -36,15 +37,15 @@ function M.handle_sort(mp_state)
     state_module.sort_groups("", next_mode)
 
     logger.info("Groups sorted: %s", next_mode)
-    mp_state:render_panel("groups")
+    mp_state:render_panel(constants.PANEL.GROUPS)
   else
     -- Check if we're viewing a dir_link (filesystem browser) vs group items
-    local is_dir_view = ui_state.last_selected_type == "dir_link" or ui_state.is_browsing_directory
+    local is_dir_view = ui_state.last_selected_type == constants.SELECTION_TYPE.DIR_LINK or ui_state.is_browsing_directory
 
     if is_dir_view then
       -- Dir_link/directory view sorting modes
-      local modes = { "name", "created", "modified", "size", "type" }
-      local current = ui_state.dir_sort_mode or "type"
+      local modes = constants.DIR_SORT_MODES
+      local current = ui_state.dir_sort_mode or constants.DEFAULTS.DIR_SORT_MODE
       local idx = 1
       for i, m in ipairs(modes) do
         if m == current then
@@ -57,7 +58,7 @@ function M.handle_sort(mp_state)
       state_module.save_ui_state(ui_state)
 
       logger.info("Directory sorted: %s", next_mode)
-      mp_state:render_panel("items")
+      mp_state:render_panel(constants.PANEL.ITEMS)
     else
       -- Regular group items sorting
       -- Try to get group_path from element data first, then fallback to ui_state
@@ -74,8 +75,8 @@ function M.handle_sort(mp_state)
         return
       end
 
-      local modes = { "custom", "name", "created", "modified", "size", "type" }
-      local current = ui_state.right_sort_mode or "custom"
+      local modes = constants.RIGHT_SORT_MODES
+      local current = ui_state.right_sort_mode or constants.DEFAULTS.RIGHT_SORT_MODE
       local idx = 1
       for i, m in ipairs(modes) do
         if m == current then
@@ -88,7 +89,7 @@ function M.handle_sort(mp_state)
       state_module.save_ui_state(ui_state)
 
       logger.info("Items sorted: %s", next_mode)
-      mp_state:render_panel("items")
+      mp_state:render_panel(constants.PANEL.ITEMS)
     end
   end
 end
@@ -100,13 +101,13 @@ function M.handle_sort_order(mp_state)
   local ui_state = state_module.load_ui_state()
 
   local order_name
-  if focused == "groups" then
+  if focused == constants.PANEL.GROUPS then
     ui_state.left_sort_asc = not ui_state.left_sort_asc
     order_name = ui_state.left_sort_asc and "ascending" or "descending"
     state_module.save_ui_state(ui_state)
-    mp_state:render_panel("groups")
+    mp_state:render_panel(constants.PANEL.GROUPS)
   else
-    local is_dir_view = ui_state.last_selected_type == "dir_link" or ui_state.is_browsing_directory
+    local is_dir_view = ui_state.last_selected_type == constants.SELECTION_TYPE.DIR_LINK or ui_state.is_browsing_directory
     if is_dir_view then
       ui_state.dir_sort_asc = not ui_state.dir_sort_asc
       order_name = ui_state.dir_sort_asc and "ascending" or "descending"
@@ -115,7 +116,7 @@ function M.handle_sort_order(mp_state)
       order_name = ui_state.right_sort_asc and "ascending" or "descending"
     end
     state_module.save_ui_state(ui_state)
-    mp_state:render_panel("items")
+    mp_state:render_panel(constants.PANEL.ITEMS)
   end
 
   logger.info("Sort order: %s", order_name)
@@ -148,7 +149,7 @@ local function freeze_items_order(mp_state, group_path)
 
   -- Switch to custom mode
   local ui_state = state_module.load_ui_state()
-  ui_state.right_sort_mode = "custom"
+  ui_state.right_sort_mode = constants.SORT_MODE.CUSTOM
   state_module.save_ui_state(ui_state)
 
   return true
@@ -163,13 +164,13 @@ function M.handle_move_up(mp_state)
   local element = mp_state:get_element_at_cursor()
   if not element or not element.data then return end
 
-  if focused == "groups" then
-    if ui_state.left_sort_mode ~= "custom" then
+  if focused == constants.PANEL.GROUPS then
+    if ui_state.left_sort_mode ~= constants.SORT_MODE.CUSTOM then
       -- Freeze current order and switch to custom mode
       state_module.freeze_groups_order()
-      ui_state.left_sort_mode = "custom"
+      ui_state.left_sort_mode = constants.SORT_MODE.CUSTOM
       state_module.save_ui_state(ui_state)
-      mp_state:render_panel("groups")
+      mp_state:render_panel(constants.PANEL.GROUPS)
       logger.info("Switched to custom sort mode")
     end
 
@@ -198,23 +199,23 @@ function M.handle_move_up(mp_state)
     end
 
     if idx > 1 then
-      local row = mp_state:get_cursor("groups")
-      state_module.reorder_up("group", parent_path, idx)
-      mp_state:render_panel("groups")
-      mp_state:set_cursor("groups", row - 1)
+      local row = mp_state:get_cursor(constants.PANEL.GROUPS)
+      state_module.reorder_up(constants.ITEM_TYPE.GROUP, parent_path, idx)
+      mp_state:render_panel(constants.PANEL.GROUPS)
+      mp_state:set_cursor(constants.PANEL.GROUPS, row - 1)
     end
   else
     -- Check if we're in a dir_link view (can't reorder filesystem)
-    if ui_state.last_selected_type == "dir_link" or ui_state.is_browsing_directory then
+    if ui_state.last_selected_type == constants.SELECTION_TYPE.DIR_LINK or ui_state.is_browsing_directory then
       logger.info("Cannot reorder directory contents")
       return
     end
 
-    if ui_state.right_sort_mode ~= "custom" then
+    if ui_state.right_sort_mode ~= constants.SORT_MODE.CUSTOM then
       -- Freeze current order and switch to custom mode
       local group_path = element.data.group_path
       if group_path and freeze_items_order(mp_state, group_path) then
-        mp_state:render_panel("items")
+        mp_state:render_panel(constants.PANEL.ITEMS)
         logger.info("Switched to custom sort mode")
       end
     end
@@ -224,10 +225,10 @@ function M.handle_move_up(mp_state)
     if not group_path or not index then return end
 
     if index > 1 then
-      local row = mp_state:get_cursor("items")
+      local row = mp_state:get_cursor(constants.PANEL.ITEMS)
       state_module.reorder_up("item", group_path, index)
-      mp_state:render_panel("items")
-      mp_state:set_cursor("items", row - 1)
+      mp_state:render_panel(constants.PANEL.ITEMS)
+      mp_state:set_cursor(constants.PANEL.ITEMS, row - 1)
     end
   end
 end
@@ -241,13 +242,13 @@ function M.handle_move_down(mp_state)
   local element = mp_state:get_element_at_cursor()
   if not element or not element.data then return end
 
-  if focused == "groups" then
-    if ui_state.left_sort_mode ~= "custom" then
+  if focused == constants.PANEL.GROUPS then
+    if ui_state.left_sort_mode ~= constants.SORT_MODE.CUSTOM then
       -- Freeze current order and switch to custom mode
       state_module.freeze_groups_order()
-      ui_state.left_sort_mode = "custom"
+      ui_state.left_sort_mode = constants.SORT_MODE.CUSTOM
       state_module.save_ui_state(ui_state)
-      mp_state:render_panel("groups")
+      mp_state:render_panel(constants.PANEL.GROUPS)
       logger.info("Switched to custom sort mode")
     end
 
@@ -274,23 +275,23 @@ function M.handle_move_down(mp_state)
     end
 
     if idx > 0 and idx < #sorted then
-      local row = mp_state:get_cursor("groups")
-      state_module.reorder_down("group", parent_path, idx)
-      mp_state:render_panel("groups")
-      mp_state:set_cursor("groups", row + 1)
+      local row = mp_state:get_cursor(constants.PANEL.GROUPS)
+      state_module.reorder_down(constants.ITEM_TYPE.GROUP, parent_path, idx)
+      mp_state:render_panel(constants.PANEL.GROUPS)
+      mp_state:set_cursor(constants.PANEL.GROUPS, row + 1)
     end
   else
     -- Check if we're in a dir_link view (can't reorder filesystem)
-    if ui_state.last_selected_type == "dir_link" or ui_state.is_browsing_directory then
+    if ui_state.last_selected_type == constants.SELECTION_TYPE.DIR_LINK or ui_state.is_browsing_directory then
       logger.info("Cannot reorder directory contents")
       return
     end
 
-    if ui_state.right_sort_mode ~= "custom" then
+    if ui_state.right_sort_mode ~= constants.SORT_MODE.CUSTOM then
       -- Freeze current order and switch to custom mode
       local group_path = element.data.group_path
       if group_path and freeze_items_order(mp_state, group_path) then
-        mp_state:render_panel("items")
+        mp_state:render_panel(constants.PANEL.ITEMS)
         logger.info("Switched to custom sort mode")
       end
     end
@@ -303,10 +304,10 @@ function M.handle_move_down(mp_state)
     local items_count = mp_state._sorted_items and #mp_state._sorted_items or 0
 
     if index < items_count then
-      local row = mp_state:get_cursor("items")
+      local row = mp_state:get_cursor(constants.PANEL.ITEMS)
       state_module.reorder_down("item", group_path, index)
-      mp_state:render_panel("items")
-      mp_state:set_cursor("items", row + 1)
+      mp_state:render_panel(constants.PANEL.ITEMS)
+      mp_state:set_cursor(constants.PANEL.ITEMS, row + 1)
     end
   end
 end
