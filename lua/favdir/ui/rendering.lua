@@ -5,6 +5,7 @@ local M = {}
 
 local state_module = require("favdir.state")
 local icons = require("favdir.ui.icons")
+local logger = require("favdir.logger")
 
 -- ============================================================================
 -- Type Definitions
@@ -182,7 +183,7 @@ function M.on_item_interact(element, mp_state)
 
   if item.type == "dir" then
     vim.cmd.cd(item.path)
-    vim.notify("Changed to: " .. item.path, vim.log.levels.INFO)
+    logger.info("Changed to: %s", item.path)
   else
     vim.cmd.edit(item.path)
   end

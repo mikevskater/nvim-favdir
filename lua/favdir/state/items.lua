@@ -5,6 +5,7 @@ local M = {}
 
 local data_module = require("favdir.state.data")
 local groups_module = require("favdir.state.groups")
+local logger = require("favdir.logger")
 
 -- ============================================================================
 -- Helper Functions
@@ -66,7 +67,7 @@ function M.add_item(group_path, item_path)
   })
 
   data_module.save_data(data)
-  vim.notify(string.format("Added %s to %s", vim.fn.fnamemodify(abs_path, ':t'), group_path), vim.log.levels.INFO)
+  logger.info("Added %s to %s", vim.fn.fnamemodify(abs_path, ':t'), group_path)
   return true, nil
 end
 

@@ -6,6 +6,7 @@ local M = {}
 local state_module = require("favdir.state")
 local dialogs = require("favdir.ui.dialogs")
 local utils = require("favdir.ui.handlers.utils")
+local logger = require("favdir.logger")
 
 -- ============================================================================
 -- Add Handlers
@@ -22,7 +23,7 @@ function M.handle_add(mp_state)
 
     -- If cursor is on a dir_link, we can't add children to it
     if node and node.is_dir_link then
-      vim.notify("Cannot add children to a directory link", vim.log.levels.WARN)
+      logger.warn("Cannot add children to a directory link")
       return
     end
 
@@ -51,13 +52,13 @@ function M.handle_add(mp_state)
               end
             end)
           else
-            vim.notify(err or "Failed to add group", vim.log.levels.ERROR)
+            logger.error(err or "Failed to add group")
           end
         end)
       else
         -- Add directory link
         if parent_path == "" then
-          vim.notify("Directory links must be added inside a group", vim.log.levels.WARN)
+          logger.warn("Directory links must be added inside a group")
           return
         end
 
@@ -82,7 +83,7 @@ function M.handle_add(mp_state)
                 end
               end)
             else
-              vim.notify(err or "Failed to add directory link", vim.log.levels.ERROR)
+              logger.error(err or "Failed to add directory link")
             end
           end)
         end)
@@ -101,7 +102,7 @@ function M.handle_add(mp_state)
     end
 
     if not group_path then
-      vim.notify("Select a group first", vim.log.levels.WARN)
+      logger.warn("Select a group first")
       return
     end
 
@@ -115,7 +116,7 @@ function M.handle_add(mp_state)
       elseif choice == "Current file" then
         path = vim.fn.expand('%:p')
         if path == "" then
-          vim.notify("No file in current buffer", vim.log.levels.WARN)
+          logger.warn("No file in current buffer")
           return
         end
       else
@@ -129,7 +130,7 @@ function M.handle_add(mp_state)
               end
             end)
           else
-            vim.notify(err or "Failed to add item", vim.log.levels.ERROR)
+            logger.error(err or "Failed to add item")
           end
         end)
         return
@@ -143,7 +144,7 @@ function M.handle_add(mp_state)
           end
         end)
       else
-        vim.notify(err or "Failed to add item", vim.log.levels.ERROR)
+        logger.error(err or "Failed to add item")
       end
     end)
   end
@@ -182,7 +183,7 @@ function M.handle_delete(mp_state)
             end
           end)
         else
-          vim.notify(err or "Failed to remove directory link", vim.log.levels.ERROR)
+          logger.error(err or "Failed to remove directory link")
         end
       end)
     else
@@ -197,7 +198,7 @@ function M.handle_delete(mp_state)
             end
           end)
         else
-          vim.notify(err or "Failed to delete group", vim.log.levels.ERROR)
+          logger.error(err or "Failed to delete group")
         end
       end)
     end
@@ -219,7 +220,7 @@ function M.handle_delete(mp_state)
           end
         end)
       else
-        vim.notify(err or "Failed to remove item", vim.log.levels.ERROR)
+        logger.error(err or "Failed to remove item")
       end
     end)
   end
@@ -243,7 +244,7 @@ function M.handle_rename(mp_state)
 
     -- Directory links cannot be renamed (delete and re-add instead)
     if node.is_dir_link then
-      vim.notify("Cannot rename directory links (use 'd' to remove and 'a' to add)", vim.log.levels.INFO)
+      logger.info("Cannot rename directory links (use 'd' to remove and 'a' to add)")
       return
     end
 
@@ -257,12 +258,12 @@ function M.handle_rename(mp_state)
             end
           end)
         else
-          vim.notify(err or "Failed to rename group", vim.log.levels.ERROR)
+          logger.error(err or "Failed to rename group")
         end
       end
     end)
   else
-    vim.notify("Cannot rename items (use 'd' to remove and 'a' to add)", vim.log.levels.INFO)
+    logger.info("Cannot rename items (use 'd' to remove and 'a' to add)")
   end
 end
 
@@ -276,7 +277,7 @@ function M.handle_move(mp_state)
   local focused = utils.get_focused_panel(mp_state)
 
   if focused ~= "items" then
-    vim.notify("Move only works for items", vim.log.levels.INFO)
+    logger.info("Move only works for items")
     return
   end
 
@@ -294,7 +295,7 @@ function M.handle_move(mp_state)
   end, groups)
 
   if #groups == 0 then
-    vim.notify("No other groups to move to", vim.log.levels.WARN)
+    logger.warn("No other groups to move to")
     return
   end
 
@@ -302,14 +303,14 @@ function M.handle_move(mp_state)
     if to_group then
       local ok, err = state_module.move_item(from_group, index, to_group)
       if ok then
-        vim.notify("Moved to " .. to_group, vim.log.levels.INFO)
+        logger.info("Moved to %s", to_group)
         vim.schedule(function()
           if mp_state and mp_state:is_valid() then
             mp_state:render_panel("items")
           end
         end)
       else
-        vim.notify(err or "Failed to move item", vim.log.levels.ERROR)
+        logger.error(err or "Failed to move item")
       end
     end
   end)
@@ -321,7 +322,7 @@ function M.handle_move_group(mp_state)
   local focused = utils.get_focused_panel(mp_state)
 
   if focused ~= "groups" then
-    vim.notify("Use 'm' to move items", vim.log.levels.INFO)
+    logger.info("Use 'm' to move items")
     return
   end
 
@@ -333,7 +334,7 @@ function M.handle_move_group(mp_state)
 
   -- Directory links cannot be moved (delete and re-add instead)
   if node.is_dir_link then
-    vim.notify("Cannot move directory links (use 'd' to remove and 'a' to add)", vim.log.levels.INFO)
+    logger.info("Cannot move directory links (use 'd' to remove and 'a' to add)")
     return
   end
 
@@ -371,7 +372,7 @@ function M.handle_move_group(mp_state)
   end
 
   if #destinations == 0 then
-    vim.notify("No valid destinations to move to", vim.log.levels.WARN)
+    logger.warn("No valid destinations to move to")
     return
   end
 
@@ -381,7 +382,7 @@ function M.handle_move_group(mp_state)
       local ok, err = state_module.move_group(group_path, new_parent)
       if ok then
         local dest_name = dest == "(Root Level)" and "root level" or dest
-        vim.notify("Moved '" .. node.name .. "' to " .. dest_name, vim.log.levels.INFO)
+        logger.info("Moved '%s' to %s", node.name, dest_name)
         vim.schedule(function()
           if mp_state and mp_state:is_valid() then
             mp_state:render_panel("groups")
@@ -389,7 +390,7 @@ function M.handle_move_group(mp_state)
           end
         end)
       else
-        vim.notify(err or "Failed to move group", vim.log.levels.ERROR)
+        logger.error(err or "Failed to move group")
       end
     end
   end)

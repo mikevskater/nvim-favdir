@@ -5,6 +5,7 @@ local M = {}
 
 local state_module = require("favdir.state")
 local utils = require("favdir.ui.handlers.utils")
+local logger = require("favdir.logger")
 
 -- ============================================================================
 -- Navigation Handlers
@@ -27,7 +28,7 @@ function M.handle_toggle_expand(mp_state)
 
   -- Directory links cannot be expanded
   if node.is_dir_link then
-    vim.notify("Directory links cannot be expanded", vim.log.levels.INFO)
+    logger.info("Directory links cannot be expanded")
     return
   end
 
@@ -36,7 +37,7 @@ function M.handle_toggle_expand(mp_state)
     state_module.toggle_expanded(node.full_path)
     mp_state:render_panel("groups")
   else
-    vim.notify("No child groups to expand", vim.log.levels.INFO)
+    logger.info("No child groups to expand")
   end
 end
 
@@ -112,7 +113,7 @@ function M.handle_browse_folder(mp_state)
 
   -- Only browse directories (including parent "..")
   if item.type ~= "dir" and item.type ~= "parent" then
-    vim.notify("Not a directory", vim.log.levels.INFO)
+    logger.info("Not a directory")
     return
   end
 
@@ -172,9 +173,9 @@ function M.handle_go_up(mp_state)
       ui_state.browse_current_path = nil
       state_module.save_ui_state(ui_state)
       mp_state:render_panel("items")
-      vim.notify("Exited directory browse", vim.log.levels.INFO)
+      logger.info("Exited directory browse")
     else
-      vim.notify("Already at top level", vim.log.levels.INFO)
+      logger.info("Already at top level")
     end
     return
   end

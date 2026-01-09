@@ -5,6 +5,7 @@ local M = {}
 
 local state_module = require("favdir.state")
 local utils = require("favdir.ui.handlers.utils")
+local logger = require("favdir.logger")
 
 -- ============================================================================
 -- Sort Handler
@@ -33,7 +34,7 @@ function M.handle_sort(mp_state)
     -- Apply sort to root groups
     state_module.sort_groups("", next_mode)
 
-    vim.notify("Groups sorted: " .. next_mode, vim.log.levels.INFO)
+    logger.info("Groups sorted: %s", next_mode)
     mp_state:render_panel("groups")
   else
     -- Check if we're viewing a dir_link (filesystem browser) vs group items
@@ -54,7 +55,7 @@ function M.handle_sort(mp_state)
       ui_state.dir_sort_mode = next_mode
       state_module.save_ui_state(ui_state)
 
-      vim.notify("Directory sorted: " .. next_mode, vim.log.levels.INFO)
+      logger.info("Directory sorted: %s", next_mode)
       mp_state:render_panel("items")
     else
       -- Regular group items sorting
@@ -68,7 +69,7 @@ function M.handle_sort(mp_state)
       end
 
       if not group_path then
-        vim.notify("Select a group first", vim.log.levels.WARN)
+        logger.warn("Select a group first")
         return
       end
 
@@ -85,7 +86,7 @@ function M.handle_sort(mp_state)
       ui_state.right_sort_mode = next_mode
       state_module.save_ui_state(ui_state)
 
-      vim.notify("Items sorted: " .. next_mode, vim.log.levels.INFO)
+      logger.info("Items sorted: %s", next_mode)
       mp_state:render_panel("items")
     end
   end
@@ -116,7 +117,7 @@ function M.handle_sort_order(mp_state)
     mp_state:render_panel("items")
   end
 
-  vim.notify("Sort order: " .. order_name, vim.log.levels.INFO)
+  logger.info("Sort order: %s", order_name)
 end
 
 -- ============================================================================
@@ -168,7 +169,7 @@ function M.handle_move_up(mp_state)
       ui_state.left_sort_mode = "custom"
       state_module.save_ui_state(ui_state)
       mp_state:render_panel("groups")
-      vim.notify("Switched to custom sort mode", vim.log.levels.INFO)
+      logger.info("Switched to custom sort mode")
     end
 
     local node = element.data.node
@@ -205,7 +206,7 @@ function M.handle_move_up(mp_state)
   else
     -- Check if we're in a dir_link view (can't reorder filesystem)
     if ui_state.last_selected_type == "dir_link" or ui_state.is_browsing_directory then
-      vim.notify("Cannot reorder directory contents", vim.log.levels.INFO)
+      logger.info("Cannot reorder directory contents")
       return
     end
 
@@ -214,7 +215,7 @@ function M.handle_move_up(mp_state)
       local group_path = element.data.group_path
       if group_path and freeze_items_order(mp_state, group_path) then
         mp_state:render_panel("items")
-        vim.notify("Switched to custom sort mode", vim.log.levels.INFO)
+        logger.info("Switched to custom sort mode")
       end
     end
 
@@ -247,7 +248,7 @@ function M.handle_move_down(mp_state)
       ui_state.left_sort_mode = "custom"
       state_module.save_ui_state(ui_state)
       mp_state:render_panel("groups")
-      vim.notify("Switched to custom sort mode", vim.log.levels.INFO)
+      logger.info("Switched to custom sort mode")
     end
 
     local node = element.data.node
@@ -282,7 +283,7 @@ function M.handle_move_down(mp_state)
   else
     -- Check if we're in a dir_link view (can't reorder filesystem)
     if ui_state.last_selected_type == "dir_link" or ui_state.is_browsing_directory then
-      vim.notify("Cannot reorder directory contents", vim.log.levels.INFO)
+      logger.info("Cannot reorder directory contents")
       return
     end
 
@@ -291,7 +292,7 @@ function M.handle_move_down(mp_state)
       local group_path = element.data.group_path
       if group_path and freeze_items_order(mp_state, group_path) then
         mp_state:render_panel("items")
-        vim.notify("Switched to custom sort mode", vim.log.levels.INFO)
+        logger.info("Switched to custom sort mode")
       end
     end
 

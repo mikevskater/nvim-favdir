@@ -9,6 +9,7 @@ local icons = require("favdir.ui.icons")
 local dialogs = require("favdir.ui.dialogs")
 local rendering = require("favdir.ui.rendering")
 local handlers = require("favdir.ui.handlers")
+local logger = require("favdir.logger")
 
 ---@type MultiPanelState?
 local panel_state = nil
@@ -155,9 +156,11 @@ function M.show(config)
   })
 
   if not panel_state then
-    vim.notify("Failed to create favorites UI", vim.log.levels.ERROR)
+    logger.error("Failed to create favorites UI")
     return
   end
+
+  logger.debug("Created multi-panel UI")
 
   -- Ensure a group is selected if none is (auto-select first group)
   local ui_state = state_module.load_ui_state()
@@ -212,7 +215,7 @@ function M.pick_group_and_add_item(item_path)
   local groups = state_module.get_group_list()
 
   if #groups == 0 then
-    vim.notify("No groups available. Create one first.", vim.log.levels.WARN)
+    logger.warn("No groups available. Create one first.")
     return
   end
 
@@ -220,7 +223,7 @@ function M.pick_group_and_add_item(item_path)
     if group then
       local ok, err = state_module.add_item(group, item_path)
       if not ok then
-        vim.notify(err or "Failed to add item", vim.log.levels.ERROR)
+        logger.error(err or "Failed to add item")
       end
     end
   end)

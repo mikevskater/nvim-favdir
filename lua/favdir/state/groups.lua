@@ -4,6 +4,7 @@
 local M = {}
 
 local data_module = require("favdir.state.data")
+local logger = require("favdir.logger")
 
 -- ============================================================================
 -- Helper Functions
@@ -153,6 +154,7 @@ function M.add_group(parent_path, name)
   })
 
   data_module.save_data(data)
+  logger.debug("Added group: %s (parent: %s)", name, parent_path or "root")
   return true, nil
 end
 
@@ -190,6 +192,7 @@ function M.remove_group(group_path)
   data_module.save_ui_state(ui_state)
 
   data_module.save_data(data)
+  logger.debug("Removed group: %s", group_path)
   return true, nil
 end
 

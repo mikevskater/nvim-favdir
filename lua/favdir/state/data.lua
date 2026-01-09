@@ -3,6 +3,8 @@
 
 local M = {}
 
+local logger = require("favdir.logger")
+
 -- ============================================================================
 -- Data Structures (Type Definitions)
 -- ============================================================================
@@ -107,9 +109,11 @@ function M.load_data()
 
   local ok, data = pcall(vim.fn.json_decode, table.concat(content, "\n"))
   if not ok or type(data) ~= "table" or not data.groups then
-    vim.notify("favdir: Failed to parse data file, using defaults", vim.log.levels.WARN)
+    logger.warn("Failed to parse data file, using defaults")
     return create_default_data()
   end
+
+  logger.debug("Loaded data with %d groups", #data.groups)
 
   return data
 end
@@ -132,16 +136,17 @@ function M.save_data(data)
 
   local ok, json = pcall(vim.fn.json_encode, data)
   if not ok then
-    vim.notify("favdir: Failed to encode data", vim.log.levels.ERROR)
+    logger.error("Failed to encode data")
     return false
   end
 
   local write_ok = pcall(vim.fn.writefile, { json }, path)
   if not write_ok then
-    vim.notify("favdir: Failed to write data file", vim.log.levels.ERROR)
+    logger.error("Failed to write data file: %s", path)
     return false
   end
 
+  logger.debug("Saved data to %s", path)
   return true
 end
 

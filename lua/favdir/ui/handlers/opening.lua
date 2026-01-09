@@ -4,6 +4,7 @@
 local M = {}
 
 local utils = require("favdir.ui.handlers.utils")
+local logger = require("favdir.logger")
 
 -- ============================================================================
 -- Open in Split Handler
@@ -14,7 +15,7 @@ local utils = require("favdir.ui.handlers.utils")
 ---@param split_cmd string "split" or "vsplit" or "tabnew"
 function M.handle_open_split(mp_state, split_cmd)
   if utils.get_focused_panel(mp_state) ~= "items" then
-    vim.notify("Select an item in the right panel", vim.log.levels.INFO)
+    logger.info("Select an item in the right panel")
     return
   end
 

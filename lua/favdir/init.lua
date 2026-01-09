@@ -5,10 +5,11 @@
 
 local M = {}
 
-M.version = "1.2.0"
+M.version = "1.2.1"
 
 local state = require("favdir.state")
 local ui = require("favdir.ui")
+local logger = require("favdir.logger")
 
 ---@class FavdirKeymaps
 ---@field open string|false Global keymap to open UI (false to disable)
@@ -41,6 +42,8 @@ local ui = require("favdir.ui")
 ---@field default_groups string[] Default groups on first run
 ---@field protected_groups string[] Groups that cannot be deleted/moved
 ---@field use_nerd_font boolean Use Nerd Font icons
+---@field debug_mode boolean Enable debug logging (default: false)
+---@field log_to_file boolean Write logs to file (default: false)
 ---@field keymaps FavdirKeymaps Keymaps configuration
 
 ---@type FavdirConfig
@@ -53,6 +56,8 @@ M.config = {
   default_groups = {},
   protected_groups = {},
   use_nerd_font = true,
+  debug_mode = false,
+  log_to_file = false,
   keymaps = {
     -- Global
     open = "<leader>ofd",
@@ -128,9 +133,19 @@ end
 local function init()
   if initialized then return end
 
+  -- Initialize logger first
+  logger.init({
+    debug_mode = M.config.debug_mode,
+    log_to_file = M.config.log_to_file,
+    notify_prefix = "favdir",
+  })
+
+  logger.debug("Initializing favdir v%s", M.version)
+
   -- Auto-detect Nerd Font if using default
   if M.config.use_nerd_font == true and not vim.g.have_nerd_font then
     M.config.use_nerd_font = detect_nerd_font()
+    logger.debug("Nerd Font auto-detected: %s", M.config.use_nerd_font)
   end
 
   -- Setup nvim-float
@@ -139,6 +154,7 @@ local function init()
   -- Initialize state with config
   state.init(M.config)
 
+  logger.debug("Initialization complete")
   initialized = true
 end
 
@@ -182,7 +198,7 @@ function M.add_file(group_path)
   init()
   local file = vim.fn.expand('%:p')
   if file == "" then
-    vim.notify("No file in current buffer", vim.log.levels.WARN)
+    logger.warn("No file in current buffer")
     return
   end
   if group_path then
