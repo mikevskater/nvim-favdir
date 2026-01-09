@@ -5,6 +5,7 @@ local M = {}
 
 local data_module = require("favdir.state.data")
 local groups_module = require("favdir.state.groups")
+local sort_comparators = require("favdir.state.sort_comparators")
 
 -- ============================================================================
 -- Sorting Functions
@@ -28,19 +29,12 @@ function M.sort_groups(parent_path, mode)
     end
   end
 
+  -- Sort using comparator
+  table.sort(groups, sort_comparators.group_comparator(mode, true))
+
+  -- Update order numbers after sorting
   if mode == "alpha" then
-    table.sort(groups, function(a, b)
-      return a.name:lower() < b.name:lower()
-    end)
-    -- Update order numbers
-    for i, g in ipairs(groups) do
-      g.order = i
-    end
-  else
-    -- Custom: sort by order field
-    table.sort(groups, function(a, b)
-      return (a.order or 0) < (b.order or 0)
-    end)
+    sort_comparators.renumber_order(groups)
   end
 
   data_module.save_data(data)
@@ -55,29 +49,12 @@ function M.sort_items(group_path, mode)
 
   if not group then return end
 
-  if mode == "alpha" then
-    table.sort(group.items, function(a, b)
-      local name_a = vim.fn.fnamemodify(a.path, ':t'):lower()
-      local name_b = vim.fn.fnamemodify(b.path, ':t'):lower()
-      return name_a < name_b
-    end)
-  elseif mode == "type" then
-    table.sort(group.items, function(a, b)
-      if a.type ~= b.type then return a.type == "dir" end
-      local name_a = vim.fn.fnamemodify(a.path, ':t'):lower()
-      local name_b = vim.fn.fnamemodify(b.path, ':t'):lower()
-      return name_a < name_b
-    end)
-  else
-    table.sort(group.items, function(a, b)
-      return (a.order or 0) < (b.order or 0)
-    end)
-  end
+  -- Map "alpha" to "name" for item comparator
+  local comparator_mode = mode == "alpha" and "name" or mode
+  table.sort(group.items, sort_comparators.item_comparator(comparator_mode, true))
 
   -- Update order numbers
-  for i, item in ipairs(group.items) do
-    item.order = i
-  end
+  sort_comparators.renumber_order(group.items)
 
   data_module.save_data(data)
 end
@@ -97,24 +74,8 @@ function M.freeze_groups_order()
     if not groups or #groups == 0 then return end
 
     -- Sort according to current mode
-    if ui_state.left_sort_mode == "alpha" then
-      table.sort(groups, function(a, b)
-        local result = a.name:lower() < b.name:lower()
-        if not left_sort_asc then
-          return not result
-        end
-        return result
-      end)
-    else
-      -- Custom mode - sort by existing order
-      table.sort(groups, function(a, b)
-        local result = (a.order or 0) < (b.order or 0)
-        if not left_sort_asc then
-          return not result
-        end
-        return result
-      end)
-    end
+    local mode = ui_state.left_sort_mode or "custom"
+    table.sort(groups, sort_comparators.group_comparator(mode, left_sort_asc))
 
     -- Assign new order values based on current position
     for i, group in ipairs(groups) do
@@ -125,9 +86,7 @@ function M.freeze_groups_order()
       end
       -- Also process dir_links order
       if group.dir_links then
-        for j, dl in ipairs(group.dir_links) do
-          dl.order = j
-        end
+        sort_comparators.renumber_order(group.dir_links)
       end
     end
   end
