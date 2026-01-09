@@ -6,23 +6,7 @@ local M = {}
 local data_module = require("favdir.state.data")
 local groups_module = require("favdir.state.groups")
 local logger = require("favdir.logger")
-
--- ============================================================================
--- Helper Functions
--- ============================================================================
-
----Get next order number for a list
----@param list FavdirItem[]
----@return number
-local function get_next_order(list)
-  local max_order = 0
-  for _, item in ipairs(list) do
-    if item.order and item.order > max_order then
-      max_order = item.order
-    end
-  end
-  return max_order + 1
-end
+local utils = require("favdir.state.utils")
 
 -- ============================================================================
 -- Item CRUD Operations
@@ -63,7 +47,7 @@ function M.add_item(group_path, item_path)
   table.insert(group.items, {
     path = abs_path,
     type = item_type,
-    order = get_next_order(group.items),
+    order = utils.get_next_order(group.items),
   })
 
   data_module.save_data(data)
@@ -89,11 +73,7 @@ function M.remove_item(group_path, item_index)
   end
 
   table.remove(group.items, item_index)
-
-  -- Renumber order
-  for i, item in ipairs(group.items) do
-    item.order = i
-  end
+  utils.renumber_order(group.items)
 
   data_module.save_data(data)
   return true, nil
@@ -131,13 +111,9 @@ function M.move_item(from_group, item_index, to_group)
     end
   end
 
-  item.order = get_next_order(target.items)
+  item.order = utils.get_next_order(target.items)
   table.insert(target.items, item)
-
-  -- Renumber source
-  for i, it in ipairs(source.items) do
-    it.order = i
-  end
+  utils.renumber_order(source.items)
 
   data_module.save_data(data)
   return true, nil

@@ -9,6 +9,7 @@ local data_module = require("favdir.state.data")
 local groups_module = require("favdir.state.groups")
 local items_module = require("favdir.state.items")
 local sorting_module = require("favdir.state.sorting")
+local utils_module = require("favdir.state.utils")
 
 -- ============================================================================
 -- Initialization
@@ -62,6 +63,14 @@ M.sort_items = sorting_module.sort_items
 M.reorder_up = sorting_module.reorder_up
 M.reorder_down = sorting_module.reorder_down
 M.freeze_groups_order = sorting_module.freeze_groups_order
+
+-- ============================================================================
+-- Re-export Utils Module Functions (for internal/advanced use)
+-- ============================================================================
+
+M.utils = utils_module -- Expose full module for advanced use
+M.get_next_order = utils_module.get_next_order
+M.renumber_order = utils_module.renumber_order
 
 -- ============================================================================
 -- UI State Helpers

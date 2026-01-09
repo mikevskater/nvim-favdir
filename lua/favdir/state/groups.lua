@@ -5,45 +5,7 @@ local M = {}
 
 local data_module = require("favdir.state.data")
 local logger = require("favdir.logger")
-
--- ============================================================================
--- Helper Functions
--- ============================================================================
-
----Get next order number for a list
----@param list FavdirGroup[]|FavdirItem[]|FavdirDirLink[]
----@return number
-local function get_next_order(list)
-  local max_order = 0
-  for _, item in ipairs(list) do
-    if item.order and item.order > max_order then
-      max_order = item.order
-    end
-  end
-  return max_order + 1
-end
-
----Get next order for group's children and dir_links combined
----@param group FavdirGroup
----@return number
-local function get_next_child_order(group)
-  local max_order = 0
-  if group.children then
-    for _, child in ipairs(group.children) do
-      if child.order and child.order > max_order then
-        max_order = child.order
-      end
-    end
-  end
-  if group.dir_links then
-    for _, link in ipairs(group.dir_links) do
-      if link.order and link.order > max_order then
-        max_order = link.order
-      end
-    end
-  end
-  return max_order + 1
-end
+local utils = require("favdir.state.utils")
 
 -- ============================================================================
 -- Group Lookup
@@ -149,7 +111,7 @@ function M.add_group(parent_path, name)
   table.insert(target_list, {
     name = name,
     items = {},
-    order = get_next_order(target_list),
+    order = utils.get_next_order(target_list),
     children = {},
   })
 
@@ -405,7 +367,7 @@ function M.add_dir_link(parent_path, name, dir_path)
   table.insert(parent.dir_links, {
     name = name,
     path = vim.fn.fnamemodify(dir_path, ':p'),
-    order = get_next_child_order(parent),
+    order = utils.get_next_child_order(parent),
   })
 
   data_module.save_data(data)
