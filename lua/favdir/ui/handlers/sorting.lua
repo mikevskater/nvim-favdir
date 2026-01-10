@@ -168,18 +168,49 @@ local function freeze_items_order(mp_state, group_path)
   return true
 end
 
----Handle move up (reorder)
+---Check if reorder is valid based on direction and current position
+---@param idx number Current index (1-based)
+---@param total number Total items count
+---@param direction "up"|"down"
+---@return boolean can_reorder
+local function can_reorder(idx, total, direction)
+  if direction == "up" then
+    return idx > 1
+  else
+    return idx > 0 and idx < total
+  end
+end
+
+---Get cursor offset based on direction
+---@param direction "up"|"down"
+---@return number offset
+local function get_cursor_offset(direction)
+  return direction == "up" and -1 or 1
+end
+
+---Get the appropriate reorder function based on direction
+---@param direction "up"|"down"
+---@return function reorder_fn
+local function get_reorder_fn(direction)
+  return direction == "up" and state_module.reorder_up or state_module.reorder_down
+end
+
+---Handle reorder (shared implementation for move up/down)
 ---@param mp_state MultiPanelState
-function M.handle_move_up(mp_state)
+---@param direction "up"|"down"
+local function handle_reorder(mp_state, direction)
   local focused = utils.get_focused_panel(mp_state)
   local ui_state = state_module.load_ui_state()
 
   local element = mp_state:get_element_at_cursor()
   if not element or not element.data then return end
 
+  local reorder_fn = get_reorder_fn(direction)
+  local cursor_offset = get_cursor_offset(direction)
+
   if focused == constants.PANEL.GROUPS then
+    -- Ensure we're in custom sort mode
     if ui_state.left_sort_mode ~= constants.SORT_MODE.CUSTOM then
-      -- Freeze current order and switch to custom mode
       state_module.freeze_groups_order()
       utils.modify_ui_state(function(state)
         state.left_sort_mode = constants.SORT_MODE.CUSTOM
@@ -191,10 +222,8 @@ function M.handle_move_up(mp_state)
     local node = utils.get_node(element)
     if not node then return end
 
-    -- Get parent path
+    -- Get parent path and find index in parent's children
     local parent_path = path_utils.get_parent_path(node.full_path)
-
-    -- Find index in parent's children (using current sorted order)
     local data = state_module.load_data()
     local parent_list = parent_path == "" and data.groups or (state_module.find_group(data, parent_path) or {}).children or {}
 
@@ -204,6 +233,7 @@ function M.handle_move_up(mp_state)
       return (a.order or 0) < (b.order or 0)
     end)
 
+    -- Find current index
     local idx = 0
     for i, g in ipairs(sorted) do
       if g.name == node.name then
@@ -212,11 +242,11 @@ function M.handle_move_up(mp_state)
       end
     end
 
-    if idx > 1 then
+    if can_reorder(idx, #sorted, direction) then
       local row = mp_state:get_cursor(constants.PANEL.GROUPS)
-      state_module.reorder_up(constants.ITEM_TYPE.GROUP, parent_path, idx)
+      reorder_fn(constants.ITEM_TYPE.GROUP, parent_path, idx)
       mp_state:render_panel(constants.PANEL.GROUPS)
-      mp_state:set_cursor(constants.PANEL.GROUPS, row - 1)
+      mp_state:set_cursor(constants.PANEL.GROUPS, row + cursor_offset)
     end
   else
     -- Check if we're in a dir_link view (can't reorder filesystem)
@@ -225,8 +255,8 @@ function M.handle_move_up(mp_state)
       return
     end
 
+    -- Ensure we're in custom sort mode
     if ui_state.right_sort_mode ~= constants.SORT_MODE.CUSTOM then
-      -- Freeze current order and switch to custom mode
       local group_path = utils.get_group_path(element)
       if group_path and freeze_items_order(mp_state, group_path) then
         mp_state:render_panel(constants.PANEL.ITEMS)
@@ -238,93 +268,27 @@ function M.handle_move_up(mp_state)
     local index = utils.get_item_index(element)
     if not group_path or not index then return end
 
-    if index > 1 then
+    local items_count = mp_state._sorted_items and #mp_state._sorted_items or 0
+
+    if can_reorder(index, items_count, direction) then
       local row = mp_state:get_cursor(constants.PANEL.ITEMS)
-      state_module.reorder_up("item", group_path, index)
+      reorder_fn("item", group_path, index)
       mp_state:render_panel(constants.PANEL.ITEMS)
-      mp_state:set_cursor(constants.PANEL.ITEMS, row - 1)
+      mp_state:set_cursor(constants.PANEL.ITEMS, row + cursor_offset)
     end
   end
+end
+
+---Handle move up (reorder)
+---@param mp_state MultiPanelState
+function M.handle_move_up(mp_state)
+  handle_reorder(mp_state, "up")
 end
 
 ---Handle move down (reorder)
 ---@param mp_state MultiPanelState
 function M.handle_move_down(mp_state)
-  local focused = utils.get_focused_panel(mp_state)
-  local ui_state = state_module.load_ui_state()
-
-  local element = mp_state:get_element_at_cursor()
-  if not element or not element.data then return end
-
-  if focused == constants.PANEL.GROUPS then
-    if ui_state.left_sort_mode ~= constants.SORT_MODE.CUSTOM then
-      -- Freeze current order and switch to custom mode
-      state_module.freeze_groups_order()
-      utils.modify_ui_state(function(state)
-        state.left_sort_mode = constants.SORT_MODE.CUSTOM
-      end)
-      mp_state:render_panel(constants.PANEL.GROUPS)
-      logger.info("Switched to custom sort mode")
-    end
-
-    local node = utils.get_node(element)
-    if not node then return end
-
-    local parent_path = path_utils.get_parent_path(node.full_path)
-
-    local data = state_module.load_data()
-    local parent_list = parent_path == "" and data.groups or (state_module.find_group(data, parent_path) or {}).children or {}
-
-    -- Sort by order to get current display order
-    local sorted = vim.tbl_values(parent_list)
-    table.sort(sorted, function(a, b)
-      return (a.order or 0) < (b.order or 0)
-    end)
-
-    local idx = 0
-    for i, g in ipairs(sorted) do
-      if g.name == node.name then
-        idx = i
-        break
-      end
-    end
-
-    if idx > 0 and idx < #sorted then
-      local row = mp_state:get_cursor(constants.PANEL.GROUPS)
-      state_module.reorder_down(constants.ITEM_TYPE.GROUP, parent_path, idx)
-      mp_state:render_panel(constants.PANEL.GROUPS)
-      mp_state:set_cursor(constants.PANEL.GROUPS, row + 1)
-    end
-  else
-    -- Check if we're in a dir_link view (can't reorder filesystem)
-    if utils.is_directory_view() then
-      logger.info("Cannot reorder directory contents")
-      return
-    end
-
-    if ui_state.right_sort_mode ~= constants.SORT_MODE.CUSTOM then
-      -- Freeze current order and switch to custom mode
-      local group_path = utils.get_group_path(element)
-      if group_path and freeze_items_order(mp_state, group_path) then
-        mp_state:render_panel(constants.PANEL.ITEMS)
-        logger.info("Switched to custom sort mode")
-      end
-    end
-
-    local group_path = utils.get_group_path(element)
-    local index = utils.get_item_index(element)
-    if not group_path or not index then return end
-
-    -- Get total items count
-    local items_count = mp_state._sorted_items and #mp_state._sorted_items or 0
-
-    if index < items_count then
-      local row = mp_state:get_cursor(constants.PANEL.ITEMS)
-      state_module.reorder_down("item", group_path, index)
-      mp_state:render_panel(constants.PANEL.ITEMS)
-      mp_state:set_cursor(constants.PANEL.ITEMS, row + 1)
-    end
-  end
+  handle_reorder(mp_state, "down")
 end
 
 return M
