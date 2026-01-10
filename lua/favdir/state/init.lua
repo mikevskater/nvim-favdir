@@ -10,6 +10,10 @@ local groups_module = require("favdir.state.groups")
 local items_module = require("favdir.state.items")
 local sorting_module = require("favdir.state.sorting")
 local utils_module = require("favdir.state.utils")
+local dir_links_module = require("favdir.state.dir_links")
+
+-- Wire up cross-module dependencies
+dir_links_module.set_groups_module(groups_module)
 
 -- ============================================================================
 -- Initialization
@@ -41,10 +45,13 @@ M.remove_group = groups_module.remove_group
 M.rename_group = groups_module.rename_group
 M.move_group = groups_module.move_group
 
--- Directory link functions
-M.add_dir_link = groups_module.add_dir_link
-M.remove_dir_link = groups_module.remove_dir_link
-M.find_dir_link = groups_module.find_dir_link
+-- ============================================================================
+-- Re-export Directory Links Module Functions
+-- ============================================================================
+
+M.add_dir_link = dir_links_module.add_dir_link
+M.remove_dir_link = dir_links_module.remove_dir_link
+M.find_dir_link = dir_links_module.find_dir_link
 
 -- ============================================================================
 -- Re-export Items Module Functions
