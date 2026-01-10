@@ -8,6 +8,7 @@ local dialogs = require("favdir.ui.dialogs")
 local utils = require("favdir.ui.handlers.utils")
 local logger = require("favdir.logger")
 local path_utils = require("favdir.path_utils")
+local constants = require("favdir.constants")
 
 -- ============================================================================
 -- Add Handlers
@@ -18,9 +19,9 @@ local path_utils = require("favdir.path_utils")
 function M.handle_add(mp_state)
   local focused = utils.get_focused_panel(mp_state)
 
-  if focused == "groups" then
+  if focused == constants.PANEL.GROUPS then
     local element = mp_state:get_element_at_cursor()
-    local node = element and element.data and element.data.node
+    local node = utils.get_node(element)
 
     -- If cursor is on a dir_link, we can't add children to it
     if node and node.is_dir_link then
@@ -47,11 +48,7 @@ function M.handle_add(mp_state)
                 state_module.toggle_expanded(parent_path)
               end
             end
-            vim.schedule(function()
-              if mp_state and mp_state:is_valid() then
-                mp_state:render_panel("groups")
-              end
-            end)
+            utils.refresh_panels(mp_state, constants.PANEL.GROUPS)
           else
             logger.error(err or "Failed to add group")
           end
@@ -78,11 +75,7 @@ function M.handle_add(mp_state)
               if not state_module.is_expanded(ui_state, parent_path) then
                 state_module.toggle_expanded(parent_path)
               end
-              vim.schedule(function()
-                if mp_state and mp_state:is_valid() then
-                  mp_state:render_panel("groups")
-                end
-              end)
+              utils.refresh_panels(mp_state, constants.PANEL.GROUPS)
             else
               logger.error(err or "Failed to add directory link")
             end
@@ -93,11 +86,9 @@ function M.handle_add(mp_state)
   else
     -- Add item to current group
     -- Try to get group_path from element data first, then fallback to ui_state
-    local group_path = nil
     local element = mp_state:get_element_at_cursor()
-    if element and element.data and element.data.group_path then
-      group_path = element.data.group_path
-    else
+    local group_path = utils.get_group_path(element)
+    if not group_path then
       local ui_state = state_module.load_ui_state()
       group_path = ui_state.last_selected_group
     end
@@ -125,11 +116,7 @@ function M.handle_add(mp_state)
         dialogs.input("Add Path", "Path:", "", function(input)
           local ok, err = state_module.add_item(group_path, input)
           if ok then
-            vim.schedule(function()
-              if mp_state and mp_state:is_valid() then
-                mp_state:render_panel("items")
-              end
-            end)
+            utils.refresh_panels(mp_state, constants.PANEL.ITEMS)
           else
             logger.error(err or "Failed to add item")
           end
@@ -139,11 +126,7 @@ function M.handle_add(mp_state)
 
       local ok, err = state_module.add_item(group_path, path)
       if ok then
-        vim.schedule(function()
-          if mp_state and mp_state:is_valid() then
-            mp_state:render_panel("items")
-          end
-        end)
+        utils.refresh_panels(mp_state, constants.PANEL.ITEMS)
       else
         logger.error(err or "Failed to add item")
       end
@@ -163,8 +146,8 @@ function M.handle_delete(mp_state)
 
   if not element or not element.data then return end
 
-  if focused == "groups" then
-    local node = element.data.node
+  if focused == constants.PANEL.GROUPS then
+    local node = utils.get_node(element)
     if not node then return end
 
     if node.is_dir_link then
@@ -175,12 +158,7 @@ function M.handle_delete(mp_state)
 
         local ok, err = state_module.remove_dir_link(parent_path, node.name)
         if ok then
-          vim.schedule(function()
-            if mp_state and mp_state:is_valid() then
-              mp_state:render_panel("groups")
-              mp_state:render_panel("items")
-            end
-          end)
+          utils.refresh_panels(mp_state, "both")
         else
           logger.error(err or "Failed to remove directory link")
         end
@@ -190,21 +168,16 @@ function M.handle_delete(mp_state)
       dialogs.confirm("Delete group '" .. node.name .. "'?", function()
         local ok, err = state_module.remove_group(node.full_path)
         if ok then
-          vim.schedule(function()
-            if mp_state and mp_state:is_valid() then
-              mp_state:render_panel("groups")
-              mp_state:render_panel("items")
-            end
-          end)
+          utils.refresh_panels(mp_state, "both")
         else
           logger.error(err or "Failed to delete group")
         end
       end)
     end
   else
-    local item = element.data.item
-    local group_path = element.data.group_path
-    local index = element.data.index
+    local item = utils.get_item(element)
+    local group_path = utils.get_group_path(element)
+    local index = utils.get_item_index(element)
 
     if not item or not group_path then return end
 
@@ -213,11 +186,7 @@ function M.handle_delete(mp_state)
     dialogs.confirm("Remove '" .. name .. "' from group?", function()
       local ok, err = state_module.remove_item(group_path, index)
       if ok then
-        vim.schedule(function()
-          if mp_state and mp_state:is_valid() then
-            mp_state:render_panel("items")
-          end
-        end)
+        utils.refresh_panels(mp_state, constants.PANEL.ITEMS)
       else
         logger.error(err or "Failed to remove item")
       end
@@ -234,11 +203,9 @@ end
 function M.handle_rename(mp_state)
   local focused = utils.get_focused_panel(mp_state)
 
-  if focused == "groups" then
+  if focused == constants.PANEL.GROUPS then
     local element = mp_state:get_element_at_cursor()
-    if not element or not element.data then return end
-
-    local node = element.data.node
+    local node = utils.get_node(element)
     if not node then return end
 
     -- Directory links cannot be renamed (delete and re-add instead)
@@ -251,11 +218,7 @@ function M.handle_rename(mp_state)
       if new_name ~= node.name then
         local ok, err = state_module.rename_group(node.full_path, new_name)
         if ok then
-          vim.schedule(function()
-            if mp_state and mp_state:is_valid() then
-              mp_state:render_panel("groups")
-            end
-          end)
+          utils.refresh_panels(mp_state, constants.PANEL.GROUPS)
         else
           logger.error(err or "Failed to rename group")
         end
@@ -275,16 +238,14 @@ end
 function M.handle_move(mp_state)
   local focused = utils.get_focused_panel(mp_state)
 
-  if focused ~= "items" then
+  if focused ~= constants.PANEL.ITEMS then
     logger.info("Move only works for items")
     return
   end
 
   local element = mp_state:get_element_at_cursor()
-  if not element or not element.data then return end
-
-  local from_group = element.data.group_path
-  local index = element.data.index
+  local from_group = utils.get_group_path(element)
+  local index = utils.get_item_index(element)
   if not from_group then return end
 
   local groups = state_module.get_group_list()
@@ -303,11 +264,7 @@ function M.handle_move(mp_state)
       local ok, err = state_module.move_item(from_group, index, to_group)
       if ok then
         logger.info("Moved to %s", to_group)
-        vim.schedule(function()
-          if mp_state and mp_state:is_valid() then
-            mp_state:render_panel("items")
-          end
-        end)
+        utils.refresh_panels(mp_state, constants.PANEL.ITEMS)
       else
         logger.error(err or "Failed to move item")
       end
@@ -320,15 +277,13 @@ end
 function M.handle_move_group(mp_state)
   local focused = utils.get_focused_panel(mp_state)
 
-  if focused ~= "groups" then
+  if focused ~= constants.PANEL.GROUPS then
     logger.info("Use 'm' to move items")
     return
   end
 
   local element = mp_state:get_element_at_cursor()
-  if not element or not element.data then return end
-
-  local node = element.data.node
+  local node = utils.get_node(element)
   if not node then return end
 
   -- Directory links cannot be moved (delete and re-add instead)
@@ -377,12 +332,7 @@ function M.handle_move_group(mp_state)
       if ok then
         local dest_name = dest == "(Root Level)" and "root level" or dest
         logger.info("Moved '%s' to %s", node.name, dest_name)
-        vim.schedule(function()
-          if mp_state and mp_state:is_valid() then
-            mp_state:render_panel("groups")
-            mp_state:render_panel("items")
-          end
-        end)
+        utils.refresh_panels(mp_state, "both")
       else
         logger.error(err or "Failed to move group")
       end

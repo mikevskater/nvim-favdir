@@ -17,14 +17,12 @@ local constants = require("favdir.constants")
 function M.handle_toggle_expand(mp_state)
   local focused = utils.get_focused_panel(mp_state)
 
-  if focused ~= "groups" then
+  if focused ~= constants.PANEL.GROUPS then
     return
   end
 
   local element = mp_state:get_element_at_cursor()
-  if not element or not element.data then return end
-
-  local node = element.data.node
+  local node = utils.get_node(element)
   if not node then return end
 
   -- Directory links cannot be expanded
@@ -36,7 +34,7 @@ function M.handle_toggle_expand(mp_state)
   if node.has_children then
     -- Toggle expansion
     state_module.toggle_expanded(node.full_path)
-    mp_state:render_panel("groups")
+    mp_state:render_panel(constants.PANEL.GROUPS)
   else
     logger.info("No child groups to expand")
   end
@@ -47,40 +45,36 @@ end
 function M.handle_enter(mp_state)
   local focused = utils.get_focused_panel(mp_state)
 
-  if focused == "groups" then
+  if focused == constants.PANEL.GROUPS then
     -- Explicitly select the group/dir_link under cursor
     local element = mp_state:get_element_at_cursor()
-    if not element or not element.data then return end
-
-    local node = element.data.node
+    local node = utils.get_node(element)
     if not node then return end
 
-    local ui_state = state_module.load_ui_state()
+    utils.modify_ui_state(function(ui_state)
+      -- Reset browse state when selecting anything on left panel
+      ui_state.is_browsing_directory = false
+      ui_state.browse_base_path = nil
+      ui_state.browse_current_path = nil
 
-    -- Reset browse state when selecting anything on left panel
-    ui_state.is_browsing_directory = false
-    ui_state.browse_base_path = nil
-    ui_state.browse_current_path = nil
-
-    if node.is_dir_link then
-      -- Select this dir_link
-      ui_state.last_selected_type = constants.SELECTION_TYPE.DIR_LINK
-      ui_state.last_selected_dir_link = node.dir_path
-      ui_state.dir_link_current_path = nil
-      ui_state.last_selected_group = nil
-    else
-      -- Select this group
-      ui_state.last_selected_type = constants.SELECTION_TYPE.GROUP
-      ui_state.last_selected_group = node.full_path
-      ui_state.last_selected_dir_link = nil
-      ui_state.dir_link_current_path = nil
-    end
-
-    state_module.save_ui_state(ui_state)
+      if node.is_dir_link then
+        -- Select this dir_link
+        ui_state.last_selected_type = constants.SELECTION_TYPE.DIR_LINK
+        ui_state.last_selected_dir_link = node.dir_path
+        ui_state.dir_link_current_path = nil
+        ui_state.last_selected_group = nil
+      else
+        -- Select this group
+        ui_state.last_selected_type = constants.SELECTION_TYPE.GROUP
+        ui_state.last_selected_group = node.full_path
+        ui_state.last_selected_dir_link = nil
+        ui_state.dir_link_current_path = nil
+      end
+    end)
 
     -- Refresh both panels
-    mp_state:render_panel("groups")
-    mp_state:render_panel("items")
+    mp_state:render_panel(constants.PANEL.GROUPS)
+    mp_state:render_panel(constants.PANEL.ITEMS)
   else
     -- On items panel, use interact_at_cursor to open file/dir
     mp_state:interact_at_cursor()
@@ -98,16 +92,12 @@ function M.handle_browse_folder(mp_state)
   local focused = utils.get_focused_panel(mp_state)
 
   -- Only works on items panel
-  if focused ~= "items" then
+  if focused ~= constants.PANEL.ITEMS then
     return
   end
 
   local element = mp_state:get_element_at_cursor()
-  if not element or not element.data then
-    return
-  end
-
-  local item = element.data.item
+  local item = utils.get_item(element)
   if not item then
     return
   end
@@ -120,27 +110,27 @@ function M.handle_browse_folder(mp_state)
 
   local ui_state = state_module.load_ui_state()
 
-  if ui_state.is_browsing_directory then
-    -- Already in browse mode (from opening a directory item) - navigate deeper
-    ui_state.browse_current_path = item.path
-  elseif mp_state._is_dir_link_view then
-    -- In dir_link view (selected from left panel) - navigate deeper
-    ui_state.dir_link_current_path = item.path
-  else
-    -- Opening a directory item from a regular group view
-    -- Enter browse mode with this directory as the base
-    ui_state.is_browsing_directory = true
-    ui_state.browse_base_path = item.path
-    ui_state.browse_current_path = item.path
-  end
-
-  state_module.save_ui_state(ui_state)
+  utils.modify_ui_state(function(state)
+    if ui_state.is_browsing_directory then
+      -- Already in browse mode (from opening a directory item) - navigate deeper
+      state.browse_current_path = item.path
+    elseif mp_state._is_dir_link_view then
+      -- In dir_link view (selected from left panel) - navigate deeper
+      state.dir_link_current_path = item.path
+    else
+      -- Opening a directory item from a regular group view
+      -- Enter browse mode with this directory as the base
+      state.is_browsing_directory = true
+      state.browse_base_path = item.path
+      state.browse_current_path = item.path
+    end
+  end)
 
   -- Re-render items panel
-  mp_state:render_panel("items")
+  mp_state:render_panel(constants.PANEL.ITEMS)
 
   -- Move cursor to first item
-  mp_state:set_cursor("items", 1, 0)
+  mp_state:set_cursor(constants.PANEL.ITEMS, 1, 0)
 end
 
 ---Handle go up (backspace) - go up one folder level when browsing directories
@@ -149,7 +139,7 @@ function M.handle_go_up(mp_state)
   local focused = utils.get_focused_panel(mp_state)
 
   -- Only works on items panel when in browse mode
-  if focused ~= "items" or not mp_state._is_dir_link_view then
+  if focused ~= constants.PANEL.ITEMS or not mp_state._is_dir_link_view then
     return
   end
 
@@ -169,11 +159,12 @@ function M.handle_go_up(mp_state)
     -- If we entered browse mode from a group item, exit browse mode
     local ui_state = state_module.load_ui_state()
     if ui_state.is_browsing_directory then
-      ui_state.is_browsing_directory = false
-      ui_state.browse_base_path = nil
-      ui_state.browse_current_path = nil
-      state_module.save_ui_state(ui_state)
-      mp_state:render_panel("items")
+      utils.modify_ui_state(function(state)
+        state.is_browsing_directory = false
+        state.browse_base_path = nil
+        state.browse_current_path = nil
+      end)
+      mp_state:render_panel(constants.PANEL.ITEMS)
       logger.info("Exited directory browse")
     else
       logger.info("Already at top level")
@@ -186,15 +177,16 @@ function M.handle_go_up(mp_state)
 
   -- Update current path in UI state
   local ui_state = state_module.load_ui_state()
-  if ui_state.is_browsing_directory then
-    ui_state.browse_current_path = parent_path
-  else
-    ui_state.dir_link_current_path = parent_path
-  end
-  state_module.save_ui_state(ui_state)
+  utils.modify_ui_state(function(state)
+    if ui_state.is_browsing_directory then
+      state.browse_current_path = parent_path
+    else
+      state.dir_link_current_path = parent_path
+    end
+  end)
 
   -- Re-render items panel
-  mp_state:render_panel("items")
+  mp_state:render_panel(constants.PANEL.ITEMS)
 end
 
 return M

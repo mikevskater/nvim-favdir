@@ -17,9 +17,9 @@ local constants = require("favdir.constants")
 ---@param mp_state MultiPanelState
 function M.handle_sort(mp_state)
   local focused = utils.get_focused_panel(mp_state)
-  local ui_state = state_module.load_ui_state()
 
   if focused == constants.PANEL.GROUPS then
+    local ui_state = state_module.load_ui_state()
     local modes = constants.LEFT_SORT_MODES
     local current = ui_state.left_sort_mode or constants.DEFAULTS.LEFT_SORT_MODE
     local idx = 1
@@ -30,8 +30,10 @@ function M.handle_sort(mp_state)
       end
     end
     local next_mode = modes[(idx % #modes) + 1]
-    ui_state.left_sort_mode = next_mode
-    state_module.save_ui_state(ui_state)
+
+    utils.modify_ui_state(function(state)
+      state.left_sort_mode = next_mode
+    end)
 
     -- Apply sort to root groups
     state_module.sort_groups("", next_mode)
@@ -40,10 +42,9 @@ function M.handle_sort(mp_state)
     mp_state:render_panel(constants.PANEL.GROUPS)
   else
     -- Check if we're viewing a dir_link (filesystem browser) vs group items
-    local is_dir_view = ui_state.last_selected_type == constants.SELECTION_TYPE.DIR_LINK or ui_state.is_browsing_directory
-
-    if is_dir_view then
+    if utils.is_directory_view() then
       -- Dir_link/directory view sorting modes
+      local ui_state = state_module.load_ui_state()
       local modes = constants.DIR_SORT_MODES
       local current = ui_state.dir_sort_mode or constants.DEFAULTS.DIR_SORT_MODE
       local idx = 1
@@ -54,19 +55,20 @@ function M.handle_sort(mp_state)
         end
       end
       local next_mode = modes[(idx % #modes) + 1]
-      ui_state.dir_sort_mode = next_mode
-      state_module.save_ui_state(ui_state)
+
+      utils.modify_ui_state(function(state)
+        state.dir_sort_mode = next_mode
+      end)
 
       logger.info("Directory sorted: %s", next_mode)
       mp_state:render_panel(constants.PANEL.ITEMS)
     else
       -- Regular group items sorting
       -- Try to get group_path from element data first, then fallback to ui_state
-      local group_path = nil
       local element = mp_state:get_element_at_cursor()
-      if element and element.data and element.data.group_path then
-        group_path = element.data.group_path
-      else
+      local group_path = utils.get_group_path(element)
+      if not group_path then
+        local ui_state = state_module.load_ui_state()
         group_path = ui_state.last_selected_group
       end
 
@@ -75,6 +77,7 @@ function M.handle_sort(mp_state)
         return
       end
 
+      local ui_state = state_module.load_ui_state()
       local modes = constants.RIGHT_SORT_MODES
       local current = ui_state.right_sort_mode or constants.DEFAULTS.RIGHT_SORT_MODE
       local idx = 1
@@ -85,8 +88,10 @@ function M.handle_sort(mp_state)
         end
       end
       local next_mode = modes[(idx % #modes) + 1]
-      ui_state.right_sort_mode = next_mode
-      state_module.save_ui_state(ui_state)
+
+      utils.modify_ui_state(function(state)
+        state.right_sort_mode = next_mode
+      end)
 
       logger.info("Items sorted: %s", next_mode)
       mp_state:render_panel(constants.PANEL.ITEMS)
@@ -98,24 +103,32 @@ end
 ---@param mp_state MultiPanelState
 function M.handle_sort_order(mp_state)
   local focused = utils.get_focused_panel(mp_state)
-  local ui_state = state_module.load_ui_state()
 
   local order_name
   if focused == constants.PANEL.GROUPS then
-    ui_state.left_sort_asc = not ui_state.left_sort_asc
-    order_name = ui_state.left_sort_asc and "ascending" or "descending"
-    state_module.save_ui_state(ui_state)
+    local ui_state = state_module.load_ui_state()
+    local new_asc = not ui_state.left_sort_asc
+    order_name = new_asc and "ascending" or "descending"
+
+    utils.modify_ui_state(function(state)
+      state.left_sort_asc = new_asc
+    end)
     mp_state:render_panel(constants.PANEL.GROUPS)
   else
-    local is_dir_view = ui_state.last_selected_type == constants.SELECTION_TYPE.DIR_LINK or ui_state.is_browsing_directory
-    if is_dir_view then
-      ui_state.dir_sort_asc = not ui_state.dir_sort_asc
-      order_name = ui_state.dir_sort_asc and "ascending" or "descending"
+    local ui_state = state_module.load_ui_state()
+    if utils.is_directory_view() then
+      local new_asc = not ui_state.dir_sort_asc
+      order_name = new_asc and "ascending" or "descending"
+      utils.modify_ui_state(function(state)
+        state.dir_sort_asc = new_asc
+      end)
     else
-      ui_state.right_sort_asc = not ui_state.right_sort_asc
-      order_name = ui_state.right_sort_asc and "ascending" or "descending"
+      local new_asc = not ui_state.right_sort_asc
+      order_name = new_asc and "ascending" or "descending"
+      utils.modify_ui_state(function(state)
+        state.right_sort_asc = new_asc
+      end)
     end
-    state_module.save_ui_state(ui_state)
     mp_state:render_panel(constants.PANEL.ITEMS)
   end
 
@@ -148,9 +161,9 @@ local function freeze_items_order(mp_state, group_path)
   end
 
   -- Switch to custom mode
-  local ui_state = state_module.load_ui_state()
-  ui_state.right_sort_mode = constants.SORT_MODE.CUSTOM
-  state_module.save_ui_state(ui_state)
+  utils.modify_ui_state(function(state)
+    state.right_sort_mode = constants.SORT_MODE.CUSTOM
+  end)
 
   return true
 end
@@ -168,13 +181,14 @@ function M.handle_move_up(mp_state)
     if ui_state.left_sort_mode ~= constants.SORT_MODE.CUSTOM then
       -- Freeze current order and switch to custom mode
       state_module.freeze_groups_order()
-      ui_state.left_sort_mode = constants.SORT_MODE.CUSTOM
-      state_module.save_ui_state(ui_state)
+      utils.modify_ui_state(function(state)
+        state.left_sort_mode = constants.SORT_MODE.CUSTOM
+      end)
       mp_state:render_panel(constants.PANEL.GROUPS)
       logger.info("Switched to custom sort mode")
     end
 
-    local node = element.data.node
+    local node = utils.get_node(element)
     if not node then return end
 
     -- Get parent path
@@ -206,22 +220,22 @@ function M.handle_move_up(mp_state)
     end
   else
     -- Check if we're in a dir_link view (can't reorder filesystem)
-    if ui_state.last_selected_type == constants.SELECTION_TYPE.DIR_LINK or ui_state.is_browsing_directory then
+    if utils.is_directory_view() then
       logger.info("Cannot reorder directory contents")
       return
     end
 
     if ui_state.right_sort_mode ~= constants.SORT_MODE.CUSTOM then
       -- Freeze current order and switch to custom mode
-      local group_path = element.data.group_path
+      local group_path = utils.get_group_path(element)
       if group_path and freeze_items_order(mp_state, group_path) then
         mp_state:render_panel(constants.PANEL.ITEMS)
         logger.info("Switched to custom sort mode")
       end
     end
 
-    local group_path = element.data.group_path
-    local index = element.data.index
+    local group_path = utils.get_group_path(element)
+    local index = utils.get_item_index(element)
     if not group_path or not index then return end
 
     if index > 1 then
@@ -246,13 +260,14 @@ function M.handle_move_down(mp_state)
     if ui_state.left_sort_mode ~= constants.SORT_MODE.CUSTOM then
       -- Freeze current order and switch to custom mode
       state_module.freeze_groups_order()
-      ui_state.left_sort_mode = constants.SORT_MODE.CUSTOM
-      state_module.save_ui_state(ui_state)
+      utils.modify_ui_state(function(state)
+        state.left_sort_mode = constants.SORT_MODE.CUSTOM
+      end)
       mp_state:render_panel(constants.PANEL.GROUPS)
       logger.info("Switched to custom sort mode")
     end
 
-    local node = element.data.node
+    local node = utils.get_node(element)
     if not node then return end
 
     local parent_path = path_utils.get_parent_path(node.full_path)
@@ -282,22 +297,22 @@ function M.handle_move_down(mp_state)
     end
   else
     -- Check if we're in a dir_link view (can't reorder filesystem)
-    if ui_state.last_selected_type == constants.SELECTION_TYPE.DIR_LINK or ui_state.is_browsing_directory then
+    if utils.is_directory_view() then
       logger.info("Cannot reorder directory contents")
       return
     end
 
     if ui_state.right_sort_mode ~= constants.SORT_MODE.CUSTOM then
       -- Freeze current order and switch to custom mode
-      local group_path = element.data.group_path
+      local group_path = utils.get_group_path(element)
       if group_path and freeze_items_order(mp_state, group_path) then
         mp_state:render_panel(constants.PANEL.ITEMS)
         logger.info("Switched to custom sort mode")
       end
     end
 
-    local group_path = element.data.group_path
-    local index = element.data.index
+    local group_path = utils.get_group_path(element)
+    local index = utils.get_item_index(element)
     if not group_path or not index then return end
 
     -- Get total items count
