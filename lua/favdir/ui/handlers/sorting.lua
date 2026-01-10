@@ -6,10 +6,63 @@ local M = {}
 local data_module = require("favdir.state.data")
 local groups_module = require("favdir.state.groups")
 local sorting_module = require("favdir.state.sorting")
+local sort_comparators = require("favdir.state.sort_comparators")
 local utils = require("favdir.ui.handlers.utils")
 local logger = require("favdir.logger")
 local path_utils = require("favdir.path_utils")
 local constants = require("favdir.constants")
+
+-- ============================================================================
+-- Async Sort Helpers
+-- ============================================================================
+
+---Show loading indicator in statusline
+---@param message string
+local function show_loading(message)
+  vim.api.nvim_echo({{ message, "WarningMsg" }}, false, {})
+  vim.cmd("redraw")
+end
+
+---Clear loading indicator
+local function clear_loading()
+  vim.api.nvim_echo({{"", "Normal"}}, false, {})
+end
+
+---Collect paths from directory entries for prefetching
+---@param dir_path string Directory path to read
+---@return string[] paths List of file paths
+local function collect_directory_paths(dir_path)
+  local paths = {}
+  local ok, entries = pcall(vim.fn.readdir, dir_path)
+  if ok and entries then
+    for _, entry in ipairs(entries) do
+      table.insert(paths, dir_path .. "/" .. entry)
+    end
+  end
+  return paths
+end
+
+---Handle sort with async prefetch for stat-requiring modes
+---@param mp_state MultiPanelState
+---@param paths string[] Paths to prefetch
+---@param next_mode string The sort mode to apply
+---@param panel string Panel to render after prefetch
+---@param update_state fun(state: FavdirUIState) Function to update UI state
+local function handle_async_sort(mp_state, paths, next_mode, panel, update_state)
+  show_loading("Loading file info for " .. next_mode .. " sort...")
+
+  sort_comparators.prefetch_stats(paths, function()
+    clear_loading()
+    utils.modify_ui_state(update_state)
+    logger.info("Sorted: %s", next_mode)
+    mp_state:render_panel(panel)
+  end, function(completed, total)
+    -- Optional: show progress for large directories
+    if total > 20 then
+      show_loading(string.format("Loading... %d/%d", completed, total))
+    end
+  end)
+end
 
 -- ============================================================================
 -- Sort Handler
@@ -58,6 +111,19 @@ function M.handle_sort(mp_state)
       end
       local next_mode = modes[(idx % #modes) + 1]
 
+      -- Check if new mode requires stat and we should prefetch async
+      if sort_comparators.mode_requires_stat(next_mode) then
+        local current_path = ui_state.dir_link_current_path or ui_state.last_selected_dir_link
+        if current_path then
+          local paths = collect_directory_paths(current_path)
+          handle_async_sort(mp_state, paths, next_mode, constants.PANEL.ITEMS, function(state)
+            state.dir_sort_mode = next_mode
+          end)
+          return
+        end
+      end
+
+      -- Sync path for non-stat modes
       utils.modify_ui_state(function(state)
         state.dir_sort_mode = next_mode
       end)
@@ -91,6 +157,20 @@ function M.handle_sort(mp_state)
       end
       local next_mode = modes[(idx % #modes) + 1]
 
+      -- Check if new mode requires stat and we should prefetch async
+      if sort_comparators.mode_requires_stat(next_mode) then
+        local data = data_module.load_data()
+        local group = groups_module.find_group(data, group_path)
+        if group and group.items and #group.items > 0 then
+          local paths = sort_comparators.collect_paths(group.items)
+          handle_async_sort(mp_state, paths, next_mode, constants.PANEL.ITEMS, function(state)
+            state.right_sort_mode = next_mode
+          end)
+          return
+        end
+      end
+
+      -- Sync path for non-stat modes
       utils.modify_ui_state(function(state)
         state.right_sort_mode = next_mode
       end)

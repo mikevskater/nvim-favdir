@@ -3,6 +3,8 @@
 
 local M = {}
 
+local stat_cache = require("favdir.state.stat_cache")
+
 -- ============================================================================
 -- Type Definitions
 -- ============================================================================
@@ -21,15 +23,11 @@ local M = {}
 -- File Stats Helpers
 -- ============================================================================
 
----Get file stats with caching during a single sort operation
+---Get file stats using cache (async-populated, sync fallback)
 ---@param path string
 ---@return table? stat
 local function get_stat(path)
-  local ok, stat = pcall(vim.loop.fs_stat, path)
-  if ok and stat then
-    return stat
-  end
-  return nil
+  return stat_cache.get_sync(path)
 end
 
 ---Get creation time from path
@@ -284,6 +282,54 @@ end
 function M.sort_and_renumber(items, opts)
   M.sort(items, opts)
   M.renumber_order(items)
+end
+
+-- ============================================================================
+-- Stat Cache Helpers
+-- ============================================================================
+
+---Check if a sort mode requires filesystem stat calls
+---@param mode SortMode
+---@return boolean
+function M.mode_requires_stat(mode)
+  return mode == "modified" or mode == "created" or mode == "size"
+end
+
+---Collect paths from items for prefetching
+---@param items table[] Items with path field
+---@param get_path? fun(item: any): string Optional path accessor
+---@return string[]
+function M.collect_paths(items, get_path)
+  local paths = {}
+  local accessor = get_path or function(item) return item.path or "" end
+  for _, item in ipairs(items) do
+    local path = accessor(item)
+    if path and path ~= "" then
+      table.insert(paths, path)
+    end
+  end
+  return paths
+end
+
+---Prefetch stats for items asynchronously
+---@param items table[] Items with path field
+---@param on_complete fun() Called when prefetch is complete
+---@param on_progress? fun(completed: number, total: number) Optional progress callback
+---@param get_path? fun(item: any): string Optional path accessor
+function M.prefetch_stats(items, on_complete, on_progress, get_path)
+  local paths = M.collect_paths(items, get_path)
+  stat_cache.prefetch_async(paths, on_complete, on_progress)
+end
+
+---Clear the stat cache
+function M.clear_cache()
+  stat_cache.clear()
+end
+
+---Invalidate cache entries matching a pattern
+---@param pattern string? Lua pattern (nil clears all)
+function M.invalidate_cache(pattern)
+  stat_cache.invalidate(pattern)
 end
 
 return M
