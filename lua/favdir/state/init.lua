@@ -80,34 +80,10 @@ M.get_next_order = utils_module.get_next_order
 M.renumber_order = utils_module.renumber_order
 
 -- ============================================================================
--- UI State Helpers
+-- Re-export UI State Helpers (from data module)
 -- ============================================================================
 
----Check if a group is expanded
----@param ui_state FavdirUIState
----@param group_path string
----@return boolean
-function M.is_expanded(ui_state, group_path)
-  return vim.tbl_contains(ui_state.expanded_groups, group_path)
-end
-
----Toggle group expansion
----@param group_path string
----@return boolean new_state
-function M.toggle_expanded(group_path)
-  local ui_state = M.load_ui_state()
-
-  if M.is_expanded(ui_state, group_path) then
-    ui_state.expanded_groups = vim.tbl_filter(function(p)
-      return p ~= group_path
-    end, ui_state.expanded_groups)
-    M.save_ui_state(ui_state)
-    return false
-  else
-    table.insert(ui_state.expanded_groups, group_path)
-    M.save_ui_state(ui_state)
-    return true
-  end
-end
+M.is_expanded = data_module.is_expanded
+M.toggle_expanded = data_module.toggle_expanded
 
 return M

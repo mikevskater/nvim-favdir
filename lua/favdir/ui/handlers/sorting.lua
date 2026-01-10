@@ -3,7 +3,9 @@
 
 local M = {}
 
-local state_module = require("favdir.state")
+local data_module = require("favdir.state.data")
+local groups_module = require("favdir.state.groups")
+local sorting_module = require("favdir.state.sorting")
 local utils = require("favdir.ui.handlers.utils")
 local logger = require("favdir.logger")
 local path_utils = require("favdir.path_utils")
@@ -19,7 +21,7 @@ function M.handle_sort(mp_state)
   local focused = utils.get_focused_panel(mp_state)
 
   if focused == constants.PANEL.GROUPS then
-    local ui_state = state_module.load_ui_state()
+    local ui_state = data_module.load_ui_state()
     local modes = constants.LEFT_SORT_MODES
     local current = ui_state.left_sort_mode or constants.DEFAULTS.LEFT_SORT_MODE
     local idx = 1
@@ -36,7 +38,7 @@ function M.handle_sort(mp_state)
     end)
 
     -- Apply sort to root groups
-    state_module.sort_groups("", next_mode)
+    sorting_module.sort_groups("", next_mode)
 
     logger.info("Groups sorted: %s", next_mode)
     mp_state:render_panel(constants.PANEL.GROUPS)
@@ -44,7 +46,7 @@ function M.handle_sort(mp_state)
     -- Check if we're viewing a dir_link (filesystem browser) vs group items
     if utils.is_directory_view() then
       -- Dir_link/directory view sorting modes
-      local ui_state = state_module.load_ui_state()
+      local ui_state = data_module.load_ui_state()
       local modes = constants.DIR_SORT_MODES
       local current = ui_state.dir_sort_mode or constants.DEFAULTS.DIR_SORT_MODE
       local idx = 1
@@ -68,7 +70,7 @@ function M.handle_sort(mp_state)
       local element = mp_state:get_element_at_cursor()
       local group_path = utils.get_group_path(element)
       if not group_path then
-        local ui_state = state_module.load_ui_state()
+        local ui_state = data_module.load_ui_state()
         group_path = ui_state.last_selected_group
       end
 
@@ -77,7 +79,7 @@ function M.handle_sort(mp_state)
         return
       end
 
-      local ui_state = state_module.load_ui_state()
+      local ui_state = data_module.load_ui_state()
       local modes = constants.RIGHT_SORT_MODES
       local current = ui_state.right_sort_mode or constants.DEFAULTS.RIGHT_SORT_MODE
       local idx = 1
@@ -106,7 +108,7 @@ function M.handle_sort_order(mp_state)
 
   local order_name
   if focused == constants.PANEL.GROUPS then
-    local ui_state = state_module.load_ui_state()
+    local ui_state = data_module.load_ui_state()
     local new_asc = not ui_state.left_sort_asc
     order_name = new_asc and "ascending" or "descending"
 
@@ -115,7 +117,7 @@ function M.handle_sort_order(mp_state)
     end)
     mp_state:render_panel(constants.PANEL.GROUPS)
   else
-    local ui_state = state_module.load_ui_state()
+    local ui_state = data_module.load_ui_state()
     if utils.is_directory_view() then
       local new_asc = not ui_state.dir_sort_asc
       order_name = new_asc and "ascending" or "descending"
@@ -153,11 +155,11 @@ local function freeze_items_order(mp_state, group_path)
   end
 
   -- Save to data file
-  local data = state_module.load_data()
-  local group = state_module.find_group(data, group_path)
+  local data = data_module.load_data()
+  local group = groups_module.find_group(data, group_path)
   if group then
     group.items = sorted_items
-    state_module.save_data(data)
+    data_module.save_data(data)
   end
 
   -- Switch to custom mode
@@ -192,7 +194,7 @@ end
 ---@param direction "up"|"down"
 ---@return function reorder_fn
 local function get_reorder_fn(direction)
-  return direction == "up" and state_module.reorder_up or state_module.reorder_down
+  return direction == "up" and sorting_module.reorder_up or sorting_module.reorder_down
 end
 
 ---Handle reorder (shared implementation for move up/down)
@@ -200,7 +202,7 @@ end
 ---@param direction "up"|"down"
 local function handle_reorder(mp_state, direction)
   local focused = utils.get_focused_panel(mp_state)
-  local ui_state = state_module.load_ui_state()
+  local ui_state = data_module.load_ui_state()
 
   local element = mp_state:get_element_at_cursor()
   if not element or not element.data then return end
@@ -211,7 +213,7 @@ local function handle_reorder(mp_state, direction)
   if focused == constants.PANEL.GROUPS then
     -- Ensure we're in custom sort mode
     if ui_state.left_sort_mode ~= constants.SORT_MODE.CUSTOM then
-      state_module.freeze_groups_order()
+      sorting_module.freeze_groups_order()
       utils.modify_ui_state(function(state)
         state.left_sort_mode = constants.SORT_MODE.CUSTOM
       end)
@@ -224,8 +226,8 @@ local function handle_reorder(mp_state, direction)
 
     -- Get parent path and find index in parent's children
     local parent_path = path_utils.get_parent_path(node.full_path)
-    local data = state_module.load_data()
-    local parent_list = parent_path == "" and data.groups or (state_module.find_group(data, parent_path) or {}).children or {}
+    local data = data_module.load_data()
+    local parent_list = parent_path == "" and data.groups or (groups_module.find_group(data, parent_path) or {}).children or {}
 
     -- Sort by order to get current display order
     local sorted = vim.tbl_values(parent_list)

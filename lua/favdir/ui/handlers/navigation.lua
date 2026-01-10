@@ -3,7 +3,7 @@
 
 local M = {}
 
-local state_module = require("favdir.state")
+local data_module = require("favdir.state.data")
 local utils = require("favdir.ui.handlers.utils")
 local logger = require("favdir.logger")
 local constants = require("favdir.constants")
@@ -33,7 +33,7 @@ function M.handle_toggle_expand(mp_state)
 
   if node.has_children then
     -- Toggle expansion
-    state_module.toggle_expanded(node.full_path)
+    data_module.toggle_expanded(node.full_path)
     mp_state:render_panel(constants.PANEL.GROUPS)
   else
     logger.info("No child groups to expand")
@@ -108,7 +108,7 @@ function M.handle_browse_folder(mp_state)
     return
   end
 
-  local ui_state = state_module.load_ui_state()
+  local ui_state = data_module.load_ui_state()
 
   utils.modify_ui_state(function(state)
     if ui_state.is_browsing_directory then
@@ -157,7 +157,7 @@ function M.handle_go_up(mp_state)
   -- Check if already at base path
   if base_normalized == current_normalized then
     -- If we entered browse mode from a group item, exit browse mode
-    local ui_state = state_module.load_ui_state()
+    local ui_state = data_module.load_ui_state()
     if ui_state.is_browsing_directory then
       utils.modify_ui_state(function(state)
         state.is_browsing_directory = false
@@ -176,7 +176,7 @@ function M.handle_go_up(mp_state)
   local parent_path = vim.fn.fnamemodify(current_path, ':h')
 
   -- Update current path in UI state
-  local ui_state = state_module.load_ui_state()
+  local ui_state = data_module.load_ui_state()
   utils.modify_ui_state(function(state)
     if ui_state.is_browsing_directory then
       state.browse_current_path = parent_path

@@ -3,7 +3,7 @@
 
 local M = {}
 
-local state_module = require("favdir.state")
+local data_module = require("favdir.state.data")
 local icons = require("favdir.ui.icons")
 local sort_comparators = require("favdir.state.sort_comparators")
 local constants = require("favdir.constants")
@@ -45,7 +45,7 @@ function M.render_dir_link_contents(mp_state, cb, base_path, current_path)
   local is_in_subfolder = vim.fn.fnamemodify(current_path, ':p') ~= vim.fn.fnamemodify(base_path, ':p')
 
   -- In browse mode (from group directory item), always show "../" as exit indicator
-  local ui_state = state_module.load_ui_state()
+  local ui_state = data_module.load_ui_state()
   local show_parent_entry = is_in_subfolder or ui_state.is_browsing_directory
 
   -- Read directory contents

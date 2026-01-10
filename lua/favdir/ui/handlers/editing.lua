@@ -3,7 +3,10 @@
 
 local M = {}
 
-local state_module = require("favdir.state")
+local data_module = require("favdir.state.data")
+local groups_module = require("favdir.state.groups")
+local items_module = require("favdir.state.items")
+local dir_links_module = require("favdir.state.dir_links")
 local dialogs = require("favdir.ui.dialogs")
 local utils = require("favdir.ui.handlers.utils")
 local logger = require("favdir.logger")
@@ -39,13 +42,13 @@ function M.handle_add(mp_state)
       if choice == "Add group" then
         -- Add child group
         dialogs.input("Add Group", "Group Name:", "", function(name)
-          local ok, err = state_module.add_group(parent_path, name)
+          local ok, err = groups_module.add_group(parent_path, name)
           if ok then
             -- Expand parent to show new child
             if parent_path ~= "" then
-              local ui_state = state_module.load_ui_state()
-              if not state_module.is_expanded(ui_state, parent_path) then
-                state_module.toggle_expanded(parent_path)
+              local ui_state = data_module.load_ui_state()
+              if not data_module.is_expanded(ui_state, parent_path) then
+                data_module.toggle_expanded(parent_path)
               end
             end
             utils.refresh_panels(mp_state, constants.PANEL.GROUPS)
@@ -68,12 +71,12 @@ function M.handle_add(mp_state)
           dialogs.input("Add Directory Link", "Display Name:", default_name, function(name)
             if not name or name == "" then return end
 
-            local ok, err = state_module.add_dir_link(parent_path, name, dir_path)
+            local ok, err = dir_links_module.add_dir_link(parent_path, name, dir_path)
             if ok then
               -- Expand parent to show new dir_link
-              local ui_state = state_module.load_ui_state()
-              if not state_module.is_expanded(ui_state, parent_path) then
-                state_module.toggle_expanded(parent_path)
+              local ui_state = data_module.load_ui_state()
+              if not data_module.is_expanded(ui_state, parent_path) then
+                data_module.toggle_expanded(parent_path)
               end
               utils.refresh_panels(mp_state, constants.PANEL.GROUPS)
             else
@@ -89,7 +92,7 @@ function M.handle_add(mp_state)
     local element = mp_state:get_element_at_cursor()
     local group_path = utils.get_group_path(element)
     if not group_path then
-      local ui_state = state_module.load_ui_state()
+      local ui_state = data_module.load_ui_state()
       group_path = ui_state.last_selected_group
     end
 
@@ -114,7 +117,7 @@ function M.handle_add(mp_state)
       else
         -- Show input popup for custom path
         dialogs.input("Add Path", "Path:", "", function(input)
-          local ok, err = state_module.add_item(group_path, input)
+          local ok, err = items_module.add_item(group_path, input)
           if ok then
             utils.refresh_panels(mp_state, constants.PANEL.ITEMS)
           else
@@ -124,7 +127,7 @@ function M.handle_add(mp_state)
         return
       end
 
-      local ok, err = state_module.add_item(group_path, path)
+      local ok, err = items_module.add_item(group_path, path)
       if ok then
         utils.refresh_panels(mp_state, constants.PANEL.ITEMS)
       else
@@ -156,7 +159,7 @@ function M.handle_delete(mp_state)
         -- Get parent path from full_path
         local parent_path = path_utils.get_parent_path(node.full_path)
 
-        local ok, err = state_module.remove_dir_link(parent_path, node.name)
+        local ok, err = dir_links_module.remove_dir_link(parent_path, node.name)
         if ok then
           utils.refresh_panels(mp_state, "both")
         else
@@ -166,7 +169,7 @@ function M.handle_delete(mp_state)
     else
       -- Delete group
       dialogs.confirm("Delete group '" .. node.name .. "'?", function()
-        local ok, err = state_module.remove_group(node.full_path)
+        local ok, err = groups_module.remove_group(node.full_path)
         if ok then
           utils.refresh_panels(mp_state, "both")
         else
@@ -184,7 +187,7 @@ function M.handle_delete(mp_state)
     local name = vim.fn.fnamemodify(item.path, ':t')
 
     dialogs.confirm("Remove '" .. name .. "' from group?", function()
-      local ok, err = state_module.remove_item(group_path, index)
+      local ok, err = items_module.remove_item(group_path, index)
       if ok then
         utils.refresh_panels(mp_state, constants.PANEL.ITEMS)
       else
@@ -216,7 +219,7 @@ function M.handle_rename(mp_state)
 
     dialogs.input("Rename Group", "New Name:", node.name, function(new_name)
       if new_name ~= node.name then
-        local ok, err = state_module.rename_group(node.full_path, new_name)
+        local ok, err = groups_module.rename_group(node.full_path, new_name)
         if ok then
           utils.refresh_panels(mp_state, constants.PANEL.GROUPS)
         else
@@ -248,7 +251,7 @@ function M.handle_move(mp_state)
   local index = utils.get_item_index(element)
   if not from_group then return end
 
-  local groups = state_module.get_group_list()
+  local groups = groups_module.get_group_list()
   -- Filter out current group
   groups = vim.tbl_filter(function(g)
     return g ~= from_group
@@ -261,7 +264,7 @@ function M.handle_move(mp_state)
 
   dialogs.select("Move to group", groups, function(_, to_group)
     if to_group then
-      local ok, err = state_module.move_item(from_group, index, to_group)
+      local ok, err = items_module.move_item(from_group, index, to_group)
       if ok then
         logger.info("Moved to %s", to_group)
         utils.refresh_panels(mp_state, constants.PANEL.ITEMS)
@@ -295,7 +298,7 @@ function M.handle_move_group(mp_state)
   local group_path = node.full_path
 
   -- Build list of possible destinations
-  local all_groups = state_module.get_group_list()
+  local all_groups = groups_module.get_group_list()
 
   -- Filter out:
   -- 1. The group itself
@@ -328,7 +331,7 @@ function M.handle_move_group(mp_state)
   dialogs.select("Move '" .. node.name .. "' to", destinations, function(idx, dest)
     if dest then
       local new_parent = dest == "(Root Level)" and "" or dest
-      local ok, err = state_module.move_group(group_path, new_parent)
+      local ok, err = groups_module.move_group(group_path, new_parent)
       if ok then
         local dest_name = dest == "(Root Level)" and "root level" or dest
         logger.info("Moved '%s' to %s", node.name, dest_name)

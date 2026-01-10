@@ -3,7 +3,7 @@
 
 local M = {}
 
-local state_module = require("favdir.state")
+local data_module = require("favdir.state.data")
 local constants = require("favdir.constants")
 
 -- ============================================================================
@@ -105,7 +105,7 @@ end
 ---Check if currently viewing a directory (dir_link or browse mode)
 ---@return boolean
 function M.is_directory_view()
-  local ui_state = state_module.load_ui_state()
+  local ui_state = data_module.load_ui_state()
   return ui_state.last_selected_type == constants.SELECTION_TYPE.DIR_LINK
       or ui_state.is_browsing_directory == true
 end
@@ -118,9 +118,9 @@ end
 ---This handles the common pattern of loading state, modifying it, and saving it back
 ---@param modifier fun(state: FavdirUIState)
 function M.modify_ui_state(modifier)
-  local ui_state = state_module.load_ui_state()
+  local ui_state = data_module.load_ui_state()
   modifier(ui_state)
-  state_module.save_ui_state(ui_state)
+  data_module.save_ui_state(ui_state)
 end
 
 return M

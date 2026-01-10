@@ -3,7 +3,8 @@
 
 local M = {}
 
-local state_module = require("favdir.state")
+local data_module = require("favdir.state.data")
+local groups_module = require("favdir.state.groups")
 local icons = require("favdir.ui.icons")
 local sort_comparators = require("favdir.state.sort_comparators")
 local constants = require("favdir.constants")
@@ -23,8 +24,8 @@ directory.set_item_interact_handler(interactions.on_item_interact)
 ---@return string[] lines
 ---@return table[] highlights
 function M.render_left_panel(mp_state)
-  local data = state_module.load_data()
-  local ui_state = state_module.load_ui_state()
+  local data = data_module.load_data()
+  local ui_state = data_module.load_ui_state()
   local nodes = tree.build_tree(data, ui_state)
 
   local ContentBuilder = require("nvim-float.content")
@@ -92,7 +93,7 @@ end
 ---@return string[] lines
 ---@return table[] highlights
 function M.render_right_panel(mp_state)
-  local ui_state = state_module.load_ui_state()
+  local ui_state = data_module.load_ui_state()
   local ContentBuilder = require("nvim-float.content")
   local cb = ContentBuilder.new()
 
@@ -116,7 +117,7 @@ function M.render_right_panel(mp_state)
   mp_state._dir_link_base_path = nil
   mp_state._dir_link_current_path = nil
 
-  local data = state_module.load_data()
+  local data = data_module.load_data()
   local group_path = ui_state.last_selected_group
 
   if not group_path then
@@ -125,7 +126,7 @@ function M.render_right_panel(mp_state)
     return cb:build_lines(), cb:build_highlights()
   end
 
-  local group = state_module.find_group(data, group_path)
+  local group = groups_module.find_group(data, group_path)
   if not group then
     cb:muted("Group not found")
     mp_state:set_panel_content_builder(constants.PANEL.ITEMS, cb)

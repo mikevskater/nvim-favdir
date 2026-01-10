@@ -229,4 +229,35 @@ function M.save_ui_state(state)
   return write_ok == true
 end
 
+-- ============================================================================
+-- UI State Helpers
+-- ============================================================================
+
+---Check if a group is expanded
+---@param ui_state FavdirUIState
+---@param group_path string
+---@return boolean
+function M.is_expanded(ui_state, group_path)
+  return vim.tbl_contains(ui_state.expanded_groups, group_path)
+end
+
+---Toggle group expansion
+---@param group_path string
+---@return boolean new_state
+function M.toggle_expanded(group_path)
+  local ui_state = M.load_ui_state()
+
+  if M.is_expanded(ui_state, group_path) then
+    ui_state.expanded_groups = vim.tbl_filter(function(p)
+      return p ~= group_path
+    end, ui_state.expanded_groups)
+    M.save_ui_state(ui_state)
+    return false
+  else
+    table.insert(ui_state.expanded_groups, group_path)
+    M.save_ui_state(ui_state)
+    return true
+  end
+end
+
 return M

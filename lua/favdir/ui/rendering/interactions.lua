@@ -3,7 +3,7 @@
 
 local M = {}
 
-local state_module = require("favdir.state")
+local data_module = require("favdir.state.data")
 local logger = require("favdir.logger")
 local constants = require("favdir.constants")
 
@@ -20,7 +20,7 @@ function M.on_group_interact(element, mp_state)
   local node = element.data.node
   if not node then return end
 
-  local ui_state = state_module.load_ui_state()
+  local ui_state = data_module.load_ui_state()
 
   -- Reset browse state when selecting anything on left panel
   ui_state.is_browsing_directory = false
@@ -41,7 +41,7 @@ function M.on_group_interact(element, mp_state)
     ui_state.dir_link_current_path = nil
   end
 
-  state_module.save_ui_state(ui_state)
+  data_module.save_ui_state(ui_state)
 
   -- Refresh both panels
   mp_state:render_panel(constants.PANEL.GROUPS)

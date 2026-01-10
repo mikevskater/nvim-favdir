@@ -3,7 +3,7 @@
 
 local M = {}
 
-local state_module = require("favdir.state")
+local data = require("favdir.state.data")
 local sort_comparators = require("favdir.state.sort_comparators")
 local constants = require("favdir.constants")
 
@@ -44,7 +44,7 @@ function M.build_tree(data, ui_state)
       local path = prefix == "" and group.name or (prefix .. "." .. group.name)
       local has_children = (group.children and #group.children > 0)
         or (group.dir_links and #group.dir_links > 0)
-      local is_expanded = state_module.is_expanded(ui_state, path)
+      local is_expanded = data.is_expanded(ui_state, path)
 
       table.insert(nodes, {
         name = group.name,
