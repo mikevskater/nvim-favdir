@@ -24,6 +24,17 @@ local use_nerd_font = true
 -- Cache for dynamically created highlight groups
 local hl_cache = {}
 
+-- nvim-web-devicons integration
+local devicons_available = false
+local devicons = nil
+
+-- Try to load nvim-web-devicons
+local ok, mod = pcall(require, "nvim-web-devicons")
+if ok then
+  devicons_available = true
+  devicons = mod
+end
+
 -- ============================================================================
 -- Type Definitions
 -- ============================================================================
@@ -205,24 +216,31 @@ local base_colors = {
 }
 
 -- ============================================================================
--- Public API
+-- Internal Helpers
 -- ============================================================================
 
----Get a base icon (expanded, collapsed, directory, file)
----@param icon_name string
----@return string icon
-function M.get_base_icon(icon_name)
-  local def = base_icons[icon_name]
-  if not def then
-    return "?"
+---Convert a highlight group name to its foreground hex color
+---@param hl_name string? Highlight group name from nvim-web-devicons
+---@return string? color Hex color like "#51A0CF" or nil
+local function hl_to_color(hl_name)
+  if not hl_name then
+    return nil
   end
-  return use_nerd_font and def.nerd or def.ascii
+
+  -- Get the highlight group definition
+  local hl = vim.api.nvim_get_hl(0, { name = hl_name, link = false })
+  if hl and hl.fg then
+    -- Convert the numeric color to hex string
+    return string.format("#%06X", hl.fg)
+  end
+
+  return nil
 end
 
----Get icon and color for a file extension
+---Get file icon using built-in icons table
 ---@param path string
 ---@return string icon, string? color
-function M.get_file_icon(path)
+local function get_builtin_file_icon(path)
   local name = vim.fn.fnamemodify(path, ':t'):lower()
   local ext = vim.fn.fnamemodify(path, ':e'):lower()
 
@@ -243,6 +261,41 @@ function M.get_file_icon(path)
   -- Default file icon
   local base = base_icons.file
   return use_nerd_font and base.nerd or base.ascii, base_colors.file
+end
+
+-- ============================================================================
+-- Public API
+-- ============================================================================
+
+---Get a base icon (expanded, collapsed, directory, file)
+---@param icon_name string
+---@return string icon
+function M.get_base_icon(icon_name)
+  local def = base_icons[icon_name]
+  if not def then
+    return "?"
+  end
+  return use_nerd_font and def.nerd or def.ascii
+end
+
+---Get icon and color for a file extension
+---Uses nvim-web-devicons if available, otherwise falls back to built-in icons
+---@param path string
+---@return string icon, string? color
+function M.get_file_icon(path)
+  -- Try nvim-web-devicons first when using Nerd Fonts
+  if use_nerd_font and devicons_available then
+    local name = vim.fn.fnamemodify(path, ':t')
+    local ext = vim.fn.fnamemodify(path, ':e')
+    local icon, hl = devicons.get_icon(name, ext, { default = false })
+    if icon then
+      local color = hl_to_color(hl)
+      return icon, color
+    end
+  end
+
+  -- Fallback to built-in icons
+  return get_builtin_file_icon(path)
 end
 
 ---Select icon set based on config
@@ -281,6 +334,12 @@ end
 ---@return string
 function M.get_file_color()
   return base_colors.file
+end
+
+---Check if nvim-web-devicons is available
+---@return boolean
+function M.has_devicons()
+  return devicons_available
 end
 
 return M
