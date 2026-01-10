@@ -33,7 +33,6 @@ function M.render_dir_link_contents(mp_state, cb, base_path, current_path)
   if vim.fn.isdirectory(current_path) ~= 1 then
     cb:muted("Directory not found:")
     cb:muted(current_path)
-    mp_state._items_content_builder = cb
     mp_state:set_panel_content_builder(constants.PANEL.ITEMS, cb)
     return cb:build_lines(), cb:build_highlights()
   end
@@ -53,7 +52,6 @@ function M.render_dir_link_contents(mp_state, cb, base_path, current_path)
   local ok, entries = pcall(vim.fn.readdir, current_path)
   if not ok or not entries then
     cb:muted("Failed to read directory")
-    mp_state._items_content_builder = cb
     mp_state:set_panel_content_builder(constants.PANEL.ITEMS, cb)
     return cb:build_lines(), cb:build_highlights()
   end
@@ -91,7 +89,6 @@ function M.render_dir_link_contents(mp_state, cb, base_path, current_path)
 
   if #entries == 0 and not show_parent_entry then
     cb:muted("Directory is empty")
-    mp_state._items_content_builder = cb
     mp_state:set_panel_content_builder(constants.PANEL.ITEMS, cb)
     return cb:build_lines(), cb:build_highlights()
   end
@@ -137,7 +134,6 @@ function M.render_dir_link_contents(mp_state, cb, base_path, current_path)
     })
   end
 
-  mp_state._items_content_builder = cb
   mp_state:set_panel_content_builder(constants.PANEL.ITEMS, cb)
 
   return cb:build_lines(), cb:build_highlights()

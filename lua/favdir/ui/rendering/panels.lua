@@ -32,8 +32,6 @@ function M.render_left_panel(mp_state)
 
   if #nodes == 0 then
     cb:muted("No groups. Press 'a' to add one.")
-    -- Store and associate ContentBuilder for element tracking
-    mp_state._groups_content_builder = cb
     mp_state:set_panel_content_builder(constants.PANEL.GROUPS, cb)
     return cb:build_lines(), cb:build_highlights()
   end
@@ -84,8 +82,6 @@ function M.render_left_panel(mp_state)
     })
   end
 
-  -- Store and associate ContentBuilder for element tracking
-  mp_state._groups_content_builder = cb
   mp_state:set_panel_content_builder(constants.PANEL.GROUPS, cb)
 
   return cb:build_lines(), cb:build_highlights()
@@ -125,7 +121,6 @@ function M.render_right_panel(mp_state)
 
   if not group_path then
     cb:muted("← Select a group to view items")
-    mp_state._items_content_builder = cb
     mp_state:set_panel_content_builder(constants.PANEL.ITEMS, cb)
     return cb:build_lines(), cb:build_highlights()
   end
@@ -133,7 +128,6 @@ function M.render_right_panel(mp_state)
   local group = state_module.find_group(data, group_path)
   if not group then
     cb:muted("Group not found")
-    mp_state._items_content_builder = cb
     mp_state:set_panel_content_builder(constants.PANEL.ITEMS, cb)
     return cb:build_lines(), cb:build_highlights()
   end
@@ -141,7 +135,6 @@ function M.render_right_panel(mp_state)
   if #group.items == 0 then
     cb:muted("No items in this group.")
     cb:muted("Press 'a' to add current dir/file.")
-    mp_state._items_content_builder = cb
     mp_state:set_panel_content_builder(constants.PANEL.ITEMS, cb)
     return cb:build_lines(), cb:build_highlights()
   end
@@ -202,8 +195,6 @@ function M.render_right_panel(mp_state)
     })
   end
 
-  -- Store and associate ContentBuilder for element tracking
-  mp_state._items_content_builder = cb
   mp_state:set_panel_content_builder(constants.PANEL.ITEMS, cb)
 
   return cb:build_lines(), cb:build_highlights()

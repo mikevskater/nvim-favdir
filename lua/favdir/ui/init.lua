@@ -7,8 +7,11 @@ local M = {}
 local state_module = require("favdir.state")
 local icons = require("favdir.ui.icons")
 local dialogs = require("favdir.ui.dialogs")
-local rendering = require("favdir.ui.rendering")
-local handlers = require("favdir.ui.handlers")
+local panels = require("favdir.ui.rendering.panels")
+local navigation = require("favdir.ui.handlers.navigation")
+local editing = require("favdir.ui.handlers.editing")
+local sorting = require("favdir.ui.handlers.sorting")
+local opening = require("favdir.ui.handlers.opening")
 local logger = require("favdir.logger")
 local constants = require("favdir.constants")
 
@@ -85,29 +88,29 @@ local function build_keymaps(keys, ps)
   end
 
   return {
-    [keys.confirm] = function() handlers.handle_enter(ps) end,
+    [keys.confirm] = function() navigation.handle_enter(ps) end,
     [keys.expand_or_browse] = function()
       if ps.focused_panel == "groups" then
-        handlers.handle_toggle_expand(ps)
+        navigation.handle_toggle_expand(ps)
       else
-        handlers.handle_browse_folder(ps)
+        navigation.handle_browse_folder(ps)
       end
     end,
-    [keys.go_up] = function() handlers.handle_go_up(ps) end,
+    [keys.go_up] = function() navigation.handle_go_up(ps) end,
     [keys.next_panel] = function() ps:focus_next_panel() end,
     [keys.prev_panel] = function() ps:focus_prev_panel() end,
-    [keys.add] = function() handlers.handle_add(ps) end,
-    [keys.delete] = function() handlers.handle_delete(ps) end,
-    [keys.rename] = function() handlers.handle_rename(ps) end,
-    [keys.move] = function() handlers.handle_move(ps) end,
-    [keys.move_group] = function() handlers.handle_move_group(ps) end,
-    [keys.sort] = function() handlers.handle_sort(ps) end,
-    [keys.sort_order] = function() handlers.handle_sort_order(ps) end,
-    [keys.reorder_up] = function() handlers.handle_move_up(ps) end,
-    [keys.reorder_down] = function() handlers.handle_move_down(ps) end,
-    [keys.open_split] = function() handlers.handle_open_split(ps, "split") end,
-    [keys.open_vsplit] = function() handlers.handle_open_split(ps, "vsplit") end,
-    [keys.open_tab] = function() handlers.handle_open_split(ps, "tabnew") end,
+    [keys.add] = function() editing.handle_add(ps) end,
+    [keys.delete] = function() editing.handle_delete(ps) end,
+    [keys.rename] = function() editing.handle_rename(ps) end,
+    [keys.move] = function() editing.handle_move(ps) end,
+    [keys.move_group] = function() editing.handle_move_group(ps) end,
+    [keys.sort] = function() sorting.handle_sort(ps) end,
+    [keys.sort_order] = function() sorting.handle_sort_order(ps) end,
+    [keys.reorder_up] = function() sorting.handle_move_up(ps) end,
+    [keys.reorder_down] = function() sorting.handle_move_down(ps) end,
+    [keys.open_split] = function() opening.handle_open_split(ps, "split") end,
+    [keys.open_vsplit] = function() opening.handle_open_split(ps, "vsplit") end,
+    [keys.open_tab] = function() opening.handle_open_split(ps, "tabnew") end,
     [keys.close] = close_handler,
     [keys.close_alt] = close_handler,
   }
@@ -136,13 +139,13 @@ function M.show(config)
           name = "groups",
           title = " Groups ",
           ratio = config.left_panel_width_ratio,
-          on_render = rendering.render_left_panel,
+          on_render = panels.render_left_panel,
         },
         {
           name = "items",
           title = " Items ",
           ratio = 1 - config.left_panel_width_ratio,
-          on_render = rendering.render_right_panel,
+          on_render = panels.render_right_panel,
         },
       },
     },
