@@ -3,14 +3,14 @@
 
 local M = {}
 
-local data_module = require("favdir.state.data")
-local groups_module = require("favdir.state.groups")
-local icons = require("favdir.ui.icons")
-local sort_comparators = require("favdir.state.sort_comparators")
-local constants = require("favdir.constants")
-local tree = require("favdir.ui.tree")
-local directory = require("favdir.ui.rendering.directory")
-local interactions = require("favdir.ui.rendering.interactions")
+local data_module = require("nvim-favdir.state.data")
+local groups_module = require("nvim-favdir.state.groups")
+local icons = require("nvim-favdir.ui.icons")
+local sort_comparators = require("nvim-favdir.state.sort_comparators")
+local constants = require("nvim-favdir.constants")
+local tree = require("nvim-favdir.ui.tree")
+local directory = require("nvim-favdir.ui.rendering.directory")
+local interactions = require("nvim-favdir.ui.rendering.interactions")
 
 -- Wire up the interaction handler to directory module
 directory.set_item_interact_handler(interactions.on_item_interact)

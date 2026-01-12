@@ -3,9 +3,9 @@
 
 local M = {}
 
-local state_data = require("favdir.state.data")
-local sort_comparators = require("favdir.state.sort_comparators")
-local constants = require("favdir.constants")
+local state_data = require("nvim-favdir.state.data")
+local sort_comparators = require("nvim-favdir.state.sort_comparators")
+local constants = require("nvim-favdir.constants")
 
 -- ============================================================================
 -- Type Definitions

@@ -5,12 +5,12 @@
 local M = {}
 
 -- Import submodules
-local data_module = require("favdir.state.data")
-local groups_module = require("favdir.state.groups")
-local items_module = require("favdir.state.items")
-local sorting_module = require("favdir.state.sorting")
-local utils_module = require("favdir.state.utils")
-local dir_links_module = require("favdir.state.dir_links")
+local data_module = require("nvim-favdir.state.data")
+local groups_module = require("nvim-favdir.state.groups")
+local items_module = require("nvim-favdir.state.items")
+local sorting_module = require("nvim-favdir.state.sorting")
+local utils_module = require("nvim-favdir.state.utils")
+local dir_links_module = require("nvim-favdir.state.dir_links")
 
 -- Wire up cross-module dependencies
 dir_links_module.set_groups_module(groups_module)

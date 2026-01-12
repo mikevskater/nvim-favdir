@@ -3,10 +3,10 @@
 
 local M = {}
 
-local data_module = require("favdir.state.data")
-local utils = require("favdir.ui.handlers.utils")
-local logger = require("favdir.logger")
-local constants = require("favdir.constants")
+local data_module = require("nvim-favdir.state.data")
+local utils = require("nvim-favdir.ui.handlers.utils")
+local logger = require("nvim-favdir.logger")
+local constants = require("nvim-favdir.constants")
 
 -- ============================================================================
 -- Navigation Handlers

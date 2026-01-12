@@ -3,9 +3,9 @@
 
 local M = {}
 
-local utils = require("favdir.ui.handlers.utils")
-local logger = require("favdir.logger")
-local constants = require("favdir.constants")
+local utils = require("nvim-favdir.ui.handlers.utils")
+local logger = require("nvim-favdir.logger")
+local constants = require("nvim-favdir.constants")
 
 -- ============================================================================
 -- Open in Split Handler

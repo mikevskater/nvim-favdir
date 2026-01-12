@@ -4,16 +4,16 @@
 
 local M = {}
 
-local state_module = require("favdir.state")
-local icons = require("favdir.ui.icons")
-local dialogs = require("favdir.ui.dialogs")
-local panels = require("favdir.ui.rendering.panels")
-local navigation = require("favdir.ui.handlers.navigation")
-local editing = require("favdir.ui.handlers.editing")
-local sorting = require("favdir.ui.handlers.sorting")
-local opening = require("favdir.ui.handlers.opening")
-local logger = require("favdir.logger")
-local constants = require("favdir.constants")
+local state_module = require("nvim-favdir.state")
+local icons = require("nvim-favdir.ui.icons")
+local dialogs = require("nvim-favdir.ui.dialogs")
+local panels = require("nvim-favdir.ui.rendering.panels")
+local navigation = require("nvim-favdir.ui.handlers.navigation")
+local editing = require("nvim-favdir.ui.handlers.editing")
+local sorting = require("nvim-favdir.ui.handlers.sorting")
+local opening = require("nvim-favdir.ui.handlers.opening")
+local logger = require("nvim-favdir.logger")
+local constants = require("nvim-favdir.constants")
 
 ---@type MultiPanelState?
 local panel_state = nil

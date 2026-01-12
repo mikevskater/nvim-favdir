@@ -3,9 +3,9 @@
 
 local M = {}
 
-local data_module = require("favdir.state.data")
-local groups_module = require("favdir.state.groups")
-local sort_comparators = require("favdir.state.sort_comparators")
+local data_module = require("nvim-favdir.state.data")
+local groups_module = require("nvim-favdir.state.groups")
+local sort_comparators = require("nvim-favdir.state.sort_comparators")
 
 -- ============================================================================
 -- Sorting Functions

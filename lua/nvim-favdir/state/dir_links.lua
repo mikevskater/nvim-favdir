@@ -3,9 +3,9 @@
 
 local M = {}
 
-local data_module = require("favdir.state.data")
-local utils = require("favdir.state.utils")
-local path_utils = require("favdir.path_utils")
+local data_module = require("nvim-favdir.state.data")
+local utils = require("nvim-favdir.state.utils")
+local path_utils = require("nvim-favdir.path_utils")
 
 -- Forward declaration for groups module to avoid circular dependency
 -- Will be set via set_groups_module()

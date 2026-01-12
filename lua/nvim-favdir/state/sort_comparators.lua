@@ -3,7 +3,7 @@
 
 local M = {}
 
-local stat_cache = require("favdir.state.stat_cache")
+local stat_cache = require("nvim-favdir.state.stat_cache")
 
 -- ============================================================================
 -- Type Definitions

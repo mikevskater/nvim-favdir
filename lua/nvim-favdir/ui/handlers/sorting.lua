@@ -3,14 +3,14 @@
 
 local M = {}
 
-local data_module = require("favdir.state.data")
-local groups_module = require("favdir.state.groups")
-local sorting_module = require("favdir.state.sorting")
-local sort_comparators = require("favdir.state.sort_comparators")
-local utils = require("favdir.ui.handlers.utils")
-local logger = require("favdir.logger")
-local path_utils = require("favdir.path_utils")
-local constants = require("favdir.constants")
+local data_module = require("nvim-favdir.state.data")
+local groups_module = require("nvim-favdir.state.groups")
+local sorting_module = require("nvim-favdir.state.sorting")
+local sort_comparators = require("nvim-favdir.state.sort_comparators")
+local utils = require("nvim-favdir.ui.handlers.utils")
+local logger = require("nvim-favdir.logger")
+local path_utils = require("nvim-favdir.path_utils")
+local constants = require("nvim-favdir.constants")
 
 -- ============================================================================
 -- Async Sort Helpers

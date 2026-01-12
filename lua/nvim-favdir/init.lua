@@ -7,9 +7,9 @@ local M = {}
 
 M.version = "1.3.1"
 
-local state = require("favdir.state")
-local ui = require("favdir.ui")
-local logger = require("favdir.logger")
+local state = require("nvim-favdir.state")
+local ui = require("nvim-favdir.ui")
+local logger = require("nvim-favdir.logger")
 
 ---@class FavdirKeymaps
 ---@field open string|false Global keymap to open UI (false to disable)

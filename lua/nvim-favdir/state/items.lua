@@ -3,10 +3,10 @@
 
 local M = {}
 
-local data_module = require("favdir.state.data")
-local groups_module = require("favdir.state.groups")
-local logger = require("favdir.logger")
-local utils = require("favdir.state.utils")
+local data_module = require("nvim-favdir.state.data")
+local groups_module = require("nvim-favdir.state.groups")
+local logger = require("nvim-favdir.logger")
+local utils = require("nvim-favdir.state.utils")
 
 -- ============================================================================
 -- Item CRUD Operations

@@ -3,8 +3,8 @@
 
 local M = {}
 
-local logger = require("favdir.logger")
-local constants = require("favdir.constants")
+local logger = require("nvim-favdir.logger")
+local constants = require("nvim-favdir.constants")
 
 -- ============================================================================
 -- Data Structures (Type Definitions)

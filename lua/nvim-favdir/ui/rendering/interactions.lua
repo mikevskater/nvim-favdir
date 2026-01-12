@@ -3,9 +3,9 @@
 
 local M = {}
 
-local data_module = require("favdir.state.data")
-local logger = require("favdir.logger")
-local constants = require("favdir.constants")
+local data_module = require("nvim-favdir.state.data")
+local logger = require("nvim-favdir.logger")
+local constants = require("nvim-favdir.constants")
 
 -- ============================================================================
 -- Interaction Handlers (called from element tracking)
@@ -59,7 +59,7 @@ function M.on_item_interact(element, mp_state)
 
   -- Handle "../" parent entry - trigger go up navigation instead of opening
   if item.type == constants.ITEM_TYPE.PARENT then
-    local navigation = require("favdir.ui.handlers.navigation")
+    local navigation = require("nvim-favdir.ui.handlers.navigation")
     navigation.handle_go_up(mp_state)
     return
   end

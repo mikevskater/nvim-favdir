@@ -3,8 +3,8 @@
 
 local M = {}
 
-local data_module = require("favdir.state.data")
-local constants = require("favdir.constants")
+local data_module = require("nvim-favdir.state.data")
+local constants = require("nvim-favdir.constants")
 
 -- ============================================================================
 -- Panel Focus

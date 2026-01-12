@@ -3,10 +3,10 @@
 
 local M = {}
 
-local data_module = require("favdir.state.data")
-local icons = require("favdir.ui.icons")
-local sort_comparators = require("favdir.state.sort_comparators")
-local constants = require("favdir.constants")
+local data_module = require("nvim-favdir.state.data")
+local icons = require("nvim-favdir.ui.icons")
+local sort_comparators = require("nvim-favdir.state.sort_comparators")
+local constants = require("nvim-favdir.constants")
 
 -- Forward declaration for interaction handler
 local on_item_interact
