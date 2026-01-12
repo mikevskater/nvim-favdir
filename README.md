@@ -362,6 +362,10 @@ All keymaps are customizable via the `keymaps` option in setup.
 | `m` | — | Move item to group |
 | `M` | Move group to parent | — |
 
+<p align="center">
+  <img src="./assets/groups.gif" alt="Group management demo" width="800">
+</p>
+
 </details>
 
 <details>
@@ -377,6 +381,10 @@ All keymaps are customizable via the `keymaps` option in setup.
 **Sort modes:**
 - Groups: `custom` → `alpha`
 - Items: `custom` → `name` → `created` → `modified` → `size` → `type`
+
+<p align="center">
+  <img src="./assets/sorting.gif" alt="Sorting demo" width="800">
+</p>
 
 </details>
 
