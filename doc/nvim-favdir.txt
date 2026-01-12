@@ -1,0 +1,439 @@
+*nvim-favdir.txt*  Favorite directories manager for Neovim
+
+Author:   mikevskater
+License:  MIT
+Version:  1.3.1
+
+==============================================================================
+CONTENTS                                                    *nvim-favdir-contents*
+
+    1. Introduction ................................ |nvim-favdir-introduction|
+    2. Requirements ................................ |nvim-favdir-requirements|
+    3. Installation ................................ |nvim-favdir-installation|
+    4. Configuration ............................... |nvim-favdir-configuration|
+    5. Commands .................................... |nvim-favdir-commands|
+    6. Keymaps ..................................... |nvim-favdir-keymaps|
+    7. API ......................................... |nvim-favdir-api|
+    8. Data Files .................................. |nvim-favdir-data|
+    9. FAQ ......................................... |nvim-favdir-faq|
+
+==============================================================================
+1. INTRODUCTION                                          *nvim-favdir-introduction*
+
+nvim-favdir is a two-panel floating UI for managing favorite directories and
+files in Neovim. It provides an intuitive way to organize, browse, and quickly
+access your most-used files and directories.
+
+Features:~
+  - Hierarchical group organization with nested groups
+  - Two-panel UI: groups on the left, contents on the right
+  - Directory links for browsing filesystem without storing items
+  - Multiple sort modes with manual reordering
+  - Persistent state across sessions
+  - Nerd Font icons with ASCII fallback
+  - Full keyboard navigation
+
+==============================================================================
+2. REQUIREMENTS                                          *nvim-favdir-requirements*
+
+- Neovim >= 0.8.0
+- nvim-float (https://github.com/mikevskater/nvim-float)
+
+Optional:~
+- nvim-web-devicons (for enhanced file icons)
+- mini.icons (alternative icon provider)
+- A Nerd Font (for proper icon display)
+
+==============================================================================
+3. INSTALLATION                                          *nvim-favdir-installation*
+
+Using lazy.nvim:~
+>lua
+    {
+      "mikevskater/nvim-favdir",
+      dependencies = {
+        "mikevskater/nvim-float",
+        "nvim-tree/nvim-web-devicons", -- optional
+      },
+      config = function()
+        require("nvim-favdir").setup()
+      end,
+    }
+<
+
+Using packer.nvim:~
+>lua
+    use {
+      "mikevskater/nvim-favdir",
+      requires = { "mikevskater/nvim-float" },
+      config = function()
+        require("nvim-favdir").setup()
+      end
+    }
+<
+
+==============================================================================
+4. CONFIGURATION                                        *nvim-favdir-configuration*
+
+Call the setup function with your options:~
+>lua
+    require("nvim-favdir").setup({
+      -- Your options here
+    })
+<
+
+                                                            *nvim-favdir-options*
+Options:~
+
+data_file                                            *favdir.data_file*
+    Type: `string`
+    Default: `vim.fn.stdpath('data') .. '/favdirs.json'`
+
+    Path to the main data file containing groups, items, and directory links.
+
+ui_state_file                                        *favdir.ui_state_file*
+    Type: `string`
+    Default: `vim.fn.stdpath('data') .. '/favdirs_ui_state.json'`
+
+    Path to UI state file (expanded groups, cursor positions, sort modes).
+
+window_height_ratio                              *favdir.window_height_ratio*
+    Type: `number`
+    Default: `0.7`
+    Range: 0.0 to 1.0
+
+    Floating window height as ratio of editor height.
+
+window_width_ratio                                *favdir.window_width_ratio*
+    Type: `number`
+    Default: `0.8`
+    Range: 0.0 to 1.0
+
+    Floating window width as ratio of editor width.
+
+left_panel_width_ratio                          *favdir.left_panel_width_ratio*
+    Type: `number`
+    Default: `0.35`
+    Range: 0.0 to 1.0
+
+    Left panel (groups) width as ratio of window width.
+
+default_groups                                        *favdir.default_groups*
+    Type: `string[]`
+    Default: `{}`
+
+    Groups to create on first run. Supports nested groups with dot notation.
+    Example: `{ "Work", "Work.Active", "Projects", "Config" }`
+
+protected_groups                                    *favdir.protected_groups*
+    Type: `string[]`
+    Default: `{}`
+
+    Groups that cannot be deleted or moved. Useful for important hierarchies.
+    Example: `{ "Work", "Config" }`
+
+use_nerd_font                                          *favdir.use_nerd_font*
+    Type: `boolean`
+    Default: `true`
+
+    Enable Nerd Font icons. Auto-detected if nvim-web-devicons or mini.icons
+    is installed. Falls back to ASCII icons if unavailable.
+
+debug_mode                                                *favdir.debug_mode*
+    Type: `boolean`
+    Default: `false`
+
+    Enable debug logging. Shows additional info about operations.
+
+log_to_file                                              *favdir.log_to_file*
+    Type: `boolean`
+    Default: `false`
+
+    Write debug logs to file instead of notifications.
+    Log file: `~/.local/share/nvim/favdir.log`
+
+keymaps                                                    *favdir.keymaps*
+    Type: `table`
+
+    Keymap configuration. See |nvim-favdir-keymaps| for all options.
+
+==============================================================================
+5. COMMANDS                                                *nvim-favdir-commands*
+
+                                                              *:FavdirOpen*
+:FavdirOpen
+    Open the favorite directories UI.
+
+                                                            *:FavdirToggle*
+:FavdirToggle
+    Toggle the UI (open if closed, close if open).
+
+                                                            *:FavdirAddDir*
+:FavdirAddDir
+    Add the current working directory to favorites.
+    Prompts for group selection.
+
+                                                           *:FavdirAddFile*
+:FavdirAddFile
+    Add the current buffer's file to favorites.
+    Prompts for group selection.
+
+==============================================================================
+6. KEYMAPS                                                  *nvim-favdir-keymaps*
+
+All keymaps are customizable via the `keymaps` option in setup.
+Set any keymap to `false` to disable it.
+
+Default keymaps:~
+>lua
+    keymaps = {
+      open = "<leader>ofd",
+      confirm = "<CR>",
+      expand_or_browse = "o",
+      go_up = "<BS>",
+      next_panel = "<Tab>",
+      prev_panel = "<S-Tab>",
+      add = "a",
+      delete = "d",
+      rename = "r",
+      move = "m",
+      move_group = "M",
+      sort = "s",
+      sort_order = "S",
+      reorder_up = "<C-k>",
+      reorder_down = "<C-j>",
+      open_split = "<C-s>",
+      open_vsplit = "|",
+      open_tab = "<C-t>",
+      close = "q",
+      close_alt = "<Esc>",
+    }
+<
+
+Navigation keymaps:~
+
+    Key             Left Panel              Right Panel~
+    `<CR>`          Select group            Open file / cd to dir
+    `<Tab>`         Switch to right panel   Switch to left panel
+    `<S-Tab>`       Switch to right panel   Switch to left panel
+    `o`             Expand/collapse group   Browse folder contents
+    `<BS>`          -                       Go up folder level
+
+Action keymaps:~
+
+    Key             Left Panel              Right Panel~
+    `a`             Add group or dir link   Add item to group
+    `d`             Delete group/dir link   Remove item
+    `r`             Rename group            -
+    `m`             -                       Move item to group
+    `M`             Move group to parent    -
+
+Sorting keymaps:~
+
+    Key             Action~
+    `s`             Cycle sort mode
+    `S`             Toggle ascending/descending
+    `<C-k>`         Reorder item up
+    `<C-j>`         Reorder item down
+
+Opening keymaps (right panel only):~
+
+    Key             Action~
+    `<C-s>`         Open in horizontal split
+    `|`             Open in vertical split
+    `<C-t>`         Open in new tab
+
+Window keymaps:~
+
+    Key             Action~
+    `q`             Close UI
+    `<Esc>`         Close UI
+
+==============================================================================
+7. API                                                          *nvim-favdir-api*
+
+                                                            *favdir.setup()*
+favdir.setup({opts})
+    Initialize and configure the plugin.
+
+    Parameters:~
+        {opts}  (table|nil)  Configuration options. See |nvim-favdir-options|.
+
+    Example:~
+>lua
+        require("nvim-favdir").setup({
+          window_height_ratio = 0.8,
+          default_groups = { "Work", "Projects" },
+        })
+<
+
+                                                             *favdir.show()*
+favdir.show()
+    Display the favorites UI window.
+
+    Example:~
+>lua
+        require("nvim-favdir").show()
+<
+
+                                                           *favdir.toggle()*
+favdir.toggle()
+    Toggle the favorites UI window (open if closed, close if open).
+
+    Example:~
+>lua
+        require("nvim-favdir").toggle()
+
+        -- Set as a keymap:
+        vim.keymap.set('n', '<leader>fd', require('nvim-favdir').toggle)
+<
+
+                                                          *favdir.add_cwd()*
+favdir.add_cwd({group_path})
+    Add the current working directory to a group.
+
+    Parameters:~
+        {group_path}  (string|nil)  Target group path. If nil, prompts user.
+
+    Example:~
+>lua
+        require("nvim-favdir").add_cwd("Work")
+        require("nvim-favdir").add_cwd()  -- prompts for group
+<
+
+                                                         *favdir.add_file()*
+favdir.add_file({group_path})
+    Add the current buffer's file to a group.
+
+    Parameters:~
+        {group_path}  (string|nil)  Target group path. If nil, prompts user.
+
+    Example:~
+>lua
+        require("nvim-favdir").add_file("Config")
+        require("nvim-favdir").add_file()  -- prompts for group
+<
+
+                                                         *favdir.get_data()*
+favdir.get_data()
+    Get all favorite directories and groups data.
+
+    Returns:~
+        (table)  Complete data structure with groups, items, dir_links.
+
+    Example:~
+>lua
+        local data = require("nvim-favdir").get_data()
+        for _, group in ipairs(data.groups) do
+          print(group.name)
+        end
+<
+
+                                                       *favdir.get_groups()*
+favdir.get_groups()
+    Get a flat list of all group paths.
+
+    Returns:~
+        (string[])  List of group paths (e.g., {"Work", "Work.Active", ...})
+
+    Example:~
+>lua
+        local groups = require("nvim-favdir").get_groups()
+        vim.ui.select(groups, { prompt = "Select group:" }, function(choice)
+          if choice then
+            require("nvim-favdir").add_cwd(choice)
+          end
+        end)
+<
+
+==============================================================================
+8. DATA FILES                                                  *nvim-favdir-data*
+
+Data is stored in your Neovim data directory:
+
+    File                                    Purpose~
+    ~/.local/share/nvim/favdirs.json        Groups, items, directory links
+    ~/.local/share/nvim/favdirs_ui_state.json  Expanded groups, cursors, sorts
+
+Run `:echo stdpath('data')` to see your exact data path.
+
+Main data structure (favdirs.json):~
+>json
+    {
+      "groups": [
+        {
+          "name": "Work",
+          "order": 1,
+          "items": [
+            { "path": "/path/to/dir", "type": "dir", "order": 1 }
+          ],
+          "children": [],
+          "dir_links": [
+            { "name": "Downloads", "path": "/home/user/Downloads", "order": 1 }
+          ]
+        }
+      ]
+    }
+<
+
+UI state structure (favdirs_ui_state.json):~
+>json
+    {
+      "expanded_groups": ["Work", "Work.Active"],
+      "last_selected_group": "Work",
+      "focused_panel": "left",
+      "left_cursor": { "row": 1, "col": 0 },
+      "right_cursor": { "row": 1, "col": 0 },
+      "left_sort_mode": "custom",
+      "right_sort_mode": "name"
+    }
+<
+
+==============================================================================
+9. FAQ                                                          *nvim-favdir-faq*
+
+Q: Icons not displaying correctly?~
+A: Install a Nerd Font (https://www.nerdfonts.com/) and set it in your
+   terminal. Popular choices: FiraCode, JetBrainsMono, Hack.
+
+Q: How do I reset all data?~
+A: Delete the data files and restart Neovim:
+>bash
+   rm ~/.local/share/nvim/favdirs.json
+   rm ~/.local/share/nvim/favdirs_ui_state.json
+<
+
+Q: How do I enable debug logging?~
+A: Set debug_mode and optionally log_to_file in setup:
+>lua
+   require('nvim-favdir').setup({
+     debug_mode = true,
+     log_to_file = true,  -- writes to ~/.local/share/nvim/favdir.log
+   })
+<
+
+Q: How do I backup my favorites?~
+A: Copy the data file:
+>bash
+   cp ~/.local/share/nvim/favdirs.json ~/favdirs.backup.json
+<
+
+Q: What are protected groups?~
+A: Protected groups cannot be deleted or moved. Configure them in setup:
+>lua
+   require('nvim-favdir').setup({
+     protected_groups = { "Work", "Config" },
+   })
+<
+
+Q: How do nested groups work?~
+A: Use dot notation for nested paths: "Work.Projects.Active" creates a
+   group "Active" inside "Projects" inside "Work".
+
+Q: What's the difference between items and directory links?~
+A: Items are files/directories stored in a group. Directory links let you
+   browse a filesystem directory directly in the right panel without
+   adding its contents as individual items.
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:
