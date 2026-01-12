@@ -148,8 +148,6 @@ local function init()
     logger.debug("Nerd Font auto-detected: %s", M.config.use_nerd_font)
   end
 
-  -- Setup nvim-float
-  require("nvim-float").setup()
 
   -- Initialize state with config
   state.init(M.config)
@@ -178,6 +176,26 @@ end
 function M.toggle()
   init()
   ui.toggle(M.config)
+end
+
+---Show the favorites UI in sandbox mode (clean state, no persistence)
+---Useful for demos, testing, and VHS recordings
+---@param initial_data FavdirData? Optional initial data
+function M.show_sandbox(initial_data)
+  init()
+  state.enable_sandbox(initial_data)
+  ui.show(M.config)
+end
+
+---Close sandbox mode and return to normal operation
+function M.close_sandbox()
+  state.disable_sandbox()
+end
+
+---Check if currently in sandbox mode
+---@return boolean
+function M.is_sandbox()
+  return state.is_sandbox()
 end
 
 ---Add the current working directory to favorites

@@ -56,6 +56,15 @@ local constants = require("favdir.constants")
 ---@type FavdirConfig?
 local config = nil
 
+---@type boolean
+local sandbox_mode = false
+
+---@type FavdirData?
+local sandbox_data = nil
+
+---@type FavdirUIState?
+local sandbox_ui_state = nil
+
 ---Initialize the data module with config
 ---@param cfg FavdirConfig
 function M.init(cfg)
@@ -66,6 +75,30 @@ end
 ---@return FavdirConfig?
 function M.get_config()
   return config
+end
+
+---Enable sandbox mode (no persistence, clean state)
+---@param initial_data FavdirData? Optional initial data for sandbox
+---@param initial_ui_state FavdirUIState? Optional initial UI state
+function M.enable_sandbox(initial_data, initial_ui_state)
+  sandbox_mode = true
+  sandbox_data = initial_data or { groups = {} }
+  sandbox_ui_state = initial_ui_state
+  logger.debug("Sandbox mode enabled")
+end
+
+---Disable sandbox mode (return to normal persistence)
+function M.disable_sandbox()
+  sandbox_mode = false
+  sandbox_data = nil
+  sandbox_ui_state = nil
+  logger.debug("Sandbox mode disabled")
+end
+
+---Check if sandbox mode is enabled
+---@return boolean
+function M.is_sandbox()
+  return sandbox_mode
 end
 
 -- ============================================================================
@@ -91,9 +124,14 @@ local function create_default_data()
   return { groups = groups }
 end
 
----Load data from file
+---Load data from file (or sandbox)
 ---@return FavdirData
 function M.load_data()
+  -- Sandbox mode: return in-memory data
+  if sandbox_mode then
+    return sandbox_data or { groups = {} }
+  end
+
   if not config then
     return create_default_data()
   end
@@ -119,10 +157,16 @@ function M.load_data()
   return data
 end
 
----Save data to file
+---Save data to file (or sandbox memory)
 ---@param data FavdirData
 ---@return boolean success
 function M.save_data(data)
+  -- Sandbox mode: store in memory only
+  if sandbox_mode then
+    sandbox_data = data
+    return true
+  end
+
   if not config then
     return false
   end
@@ -179,9 +223,17 @@ local function create_default_ui_state()
   }
 end
 
----Load UI state from file
+---Load UI state from file (or sandbox)
 ---@return FavdirUIState
 function M.load_ui_state()
+  -- Sandbox mode: return in-memory state or default
+  if sandbox_mode then
+    if sandbox_ui_state then
+      return vim.tbl_deep_extend("force", create_default_ui_state(), sandbox_ui_state)
+    end
+    return create_default_ui_state()
+  end
+
   if not config then
     return create_default_ui_state()
   end
@@ -205,10 +257,16 @@ function M.load_ui_state()
   return vim.tbl_deep_extend("force", create_default_ui_state(), state)
 end
 
----Save UI state to file
+---Save UI state to file (or sandbox memory)
 ---@param state FavdirUIState
 ---@return boolean success
 function M.save_ui_state(state)
+  -- Sandbox mode: store in memory only
+  if sandbox_mode then
+    sandbox_ui_state = state
+    return true
+  end
+
   if not config then
     return false
   end

@@ -21,3 +21,7 @@ end, { desc = 'Add current directory to favorites' })
 vim.api.nvim_create_user_command('FavdirAddFile', function()
   require('favdir').add_file()
 end, { desc = 'Add current file to favorites' })
+
+vim.api.nvim_create_user_command('FavdirSandbox', function()
+  require('favdir').show_sandbox()
+end, { desc = 'Open favorite directories UI in sandbox mode (no persistence)' })

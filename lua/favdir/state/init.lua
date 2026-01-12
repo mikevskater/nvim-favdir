@@ -86,4 +86,12 @@ M.renumber_order = utils_module.renumber_order
 M.is_expanded = data_module.is_expanded
 M.toggle_expanded = data_module.toggle_expanded
 
+-- ============================================================================
+-- Re-export Sandbox Functions (from data module)
+-- ============================================================================
+
+M.enable_sandbox = data_module.enable_sandbox
+M.disable_sandbox = data_module.disable_sandbox
+M.is_sandbox = data_module.is_sandbox
+
 return M
