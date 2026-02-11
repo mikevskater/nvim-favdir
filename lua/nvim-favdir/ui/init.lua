@@ -14,6 +14,7 @@ local sorting = require("nvim-favdir.ui.handlers.sorting")
 local opening = require("nvim-favdir.ui.handlers.opening")
 local logger = require("nvim-favdir.logger")
 local constants = require("nvim-favdir.constants")
+local dir_cache = require("nvim-favdir.state.dir_cache")
 
 ---@type MultiPanelState?
 local panel_state = nil
@@ -45,6 +46,7 @@ local function build_controls(keys)
         { key = keys.rename, desc = "Rename group" },
         { key = keys.move, desc = "Move item to group" },
         { key = keys.move_group, desc = "Move group to parent" },
+        { key = keys.yank_path, desc = "Copy path to clipboard" },
       },
     },
     {
@@ -83,7 +85,9 @@ local function build_keymaps(keys, ps)
     local uis = state_module.load_ui_state()
     uis.left_cursor = { row = row_l, col = col_l }
     uis.right_cursor = { row = row_r, col = col_r }
+    uis.focused_panel = ps.focused_panel == "items" and "right" or "left"
     state_module.save_ui_state(uis)
+    dir_cache.clear()
     ps:close()
   end
 
@@ -108,6 +112,7 @@ local function build_keymaps(keys, ps)
     [keys.sort_order] = function() sorting.handle_sort_order(ps) end,
     [keys.reorder_up] = function() sorting.handle_move_up(ps) end,
     [keys.reorder_down] = function() sorting.handle_move_down(ps) end,
+    [keys.yank_path] = function() navigation.handle_yank_path(ps) end,
     [keys.open_split] = function() opening.handle_open_split(ps, "split") end,
     [keys.open_vsplit] = function() opening.handle_open_split(ps, "vsplit") end,
     [keys.open_tab] = function() opening.handle_open_split(ps, "tabnew") end,
@@ -152,9 +157,10 @@ function M.show(config)
     total_width_ratio = config.window_width_ratio,
     total_height_ratio = config.window_height_ratio,
     footer = "? = Controls",
-    initial_focus = "groups",
+    initial_focus = (state_module.load_ui_state().focused_panel == "right") and "items" or "groups",
     controls = build_controls(keys),
     on_close = function()
+      dir_cache.clear()
       panel_state = nil
     end,
   })
@@ -190,14 +196,18 @@ function M.show(config)
     end
   end)
 
-  -- Restore cursor positions
-  local ui_state = state_module.load_ui_state()
-  if ui_state.left_cursor then
-    panel_state:set_cursor("groups", ui_state.left_cursor.row, ui_state.left_cursor.col)
-  end
-  if ui_state.right_cursor then
-    panel_state:set_cursor("items", ui_state.right_cursor.row, ui_state.right_cursor.col)
-  end
+  -- Restore cursor positions (deferred to run after render completes)
+  vim.schedule(function()
+    if panel_state and panel_state:is_valid() then
+      local saved_ui_state = state_module.load_ui_state()
+      if saved_ui_state.left_cursor then
+        panel_state:set_cursor("groups", saved_ui_state.left_cursor.row, saved_ui_state.left_cursor.col)
+      end
+      if saved_ui_state.right_cursor then
+        panel_state:set_cursor("items", saved_ui_state.right_cursor.row, saved_ui_state.right_cursor.col)
+      end
+    end
+  end)
 
   -- Setup keymaps from config
   panel_state:set_keymaps(build_keymaps(keys, panel_state))
