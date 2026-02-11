@@ -55,12 +55,12 @@ function M.add_item(group_path, item_path)
   return true, nil
 end
 
----Remove an item from a group
+---Remove an item from a group by its path
 ---@param group_path string Group path
----@param item_index number 1-based index
+---@param item_path string Absolute path of the item to remove
 ---@return boolean success
 ---@return string? error_message
-function M.remove_item(group_path, item_index)
+function M.remove_item(group_path, item_path)
   local data = data_module.load_data()
   local group = groups_module.find_group(data, group_path)
 
@@ -68,24 +68,25 @@ function M.remove_item(group_path, item_index)
     return false, "Group not found"
   end
 
-  if item_index < 1 or item_index > #group.items then
-    return false, "Invalid item index"
+  for i, item in ipairs(group.items) do
+    if item.path == item_path then
+      table.remove(group.items, i)
+      utils.renumber_order(group.items)
+      data_module.save_data(data)
+      return true, nil
+    end
   end
 
-  table.remove(group.items, item_index)
-  utils.renumber_order(group.items)
-
-  data_module.save_data(data)
-  return true, nil
+  return false, "Item not found in group"
 end
 
----Move an item to another group
+---Move an item to another group by its path
 ---@param from_group string Source group path
----@param item_index number 1-based index of item
+---@param item_path string Absolute path of the item to move
 ---@param to_group string Target group path
 ---@return boolean success
 ---@return string? error_message
-function M.move_item(from_group, item_index, to_group)
+function M.move_item(from_group, item_path, to_group)
   local data = data_module.load_data()
   local source = groups_module.find_group(data, from_group)
   local target = groups_module.find_group(data, to_group)
@@ -96,8 +97,18 @@ function M.move_item(from_group, item_index, to_group)
   if not target then
     return false, "Target group not found"
   end
-  if item_index < 1 or item_index > #source.items then
-    return false, "Invalid item index"
+
+  -- Find item by path in source group
+  local item_index
+  for i, item in ipairs(source.items) do
+    if item.path == item_path then
+      item_index = i
+      break
+    end
+  end
+
+  if not item_index then
+    return false, "Item not found in source group"
   end
 
   local item = table.remove(source.items, item_index)

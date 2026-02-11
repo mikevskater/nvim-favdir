@@ -120,57 +120,61 @@ function M.create_comparator(opts)
   local get_order = opts.get_order or default_get_order
   local get_name = opts.get_name or default_get_name
 
+  -- Strict weak ordering: never return true for equal elements.
+  -- Ascending/descending only affects the primary comparison; tiebreaker is always by name ascending.
   return function(a, b)
-    local result
-
     if mode == "custom" then
-      result = get_order(a) < get_order(b)
+      local oa, ob = get_order(a), get_order(b)
+      if oa ~= ob then
+        if ascending then return oa < ob else return oa > ob end
+      end
+      return get_name(a):lower() < get_name(b):lower()
 
     elseif mode == "name" or mode == "alpha" then
-      local name_a = get_name(a):lower()
-      local name_b = get_name(b):lower()
-      result = name_a < name_b
+      local na, nb = get_name(a):lower(), get_name(b):lower()
+      if na ~= nb then
+        if ascending then return na < nb else return na > nb end
+      end
+      return false
 
     elseif mode == "created" then
-      local time_a = get_created_time(get_path(a))
-      local time_b = get_created_time(get_path(b))
-      -- Newest first by default (so we compare > not <)
-      result = time_a > time_b
+      local ta, tb = get_created_time(get_path(a)), get_created_time(get_path(b))
+      if ta ~= tb then
+        -- Newest first by default (ascending = newest first)
+        if ascending then return ta > tb else return ta < tb end
+      end
+      return get_name(a):lower() < get_name(b):lower()
 
     elseif mode == "modified" then
-      local time_a = get_modified_time(get_path(a))
-      local time_b = get_modified_time(get_path(b))
-      -- Newest first by default
-      result = time_a > time_b
+      local ta, tb = get_modified_time(get_path(a)), get_modified_time(get_path(b))
+      if ta ~= tb then
+        if ascending then return ta > tb else return ta < tb end
+      end
+      return get_name(a):lower() < get_name(b):lower()
 
     elseif mode == "size" then
-      local size_a = get_size(get_path(a), get_type(a))
-      local size_b = get_size(get_path(b), get_type(b))
-      -- Largest first by default
-      result = size_a > size_b
+      local sa, sb = get_size(get_path(a), get_type(a)), get_size(get_path(b), get_type(b))
+      if sa ~= sb then
+        if ascending then return sa > sb else return sa < sb end
+      end
+      return get_name(a):lower() < get_name(b):lower()
 
     elseif mode == "type" then
-      -- Directories first, then files, alphabetically within each
-      local type_a = get_type(a)
-      local type_b = get_type(b)
-      if type_a ~= type_b then
-        result = type_a == "dir"
-      else
-        local name_a = get_name(a):lower()
-        local name_b = get_name(b):lower()
-        result = name_a < name_b
+      local ta, tb = get_type(a), get_type(b)
+      if ta ~= tb then
+        if ascending then return ta == "dir" else return tb == "dir" end
       end
+      local na, nb = get_name(a):lower(), get_name(b):lower()
+      if na ~= nb then return na < nb end
+      return false
 
     else
-      -- Fallback to custom
-      result = get_order(a) < get_order(b)
+      local oa, ob = get_order(a), get_order(b)
+      if oa ~= ob then
+        if ascending then return oa < ob else return oa > ob end
+      end
+      return get_name(a):lower() < get_name(b):lower()
     end
-
-    -- Reverse if descending
-    if not ascending then
-      return not result
-    end
-    return result
   end
 end
 
@@ -237,6 +241,7 @@ function M.directory_comparator(mode, ascending)
 
   -- Wrap to ensure parent entry always comes first
   return function(a, b)
+    if a.type == "parent" and b.type == "parent" then return false end
     if a.type == "parent" then return true end
     if b.type == "parent" then return false end
     return base_comparator(a, b)

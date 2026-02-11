@@ -180,14 +180,13 @@ function M.handle_delete(mp_state)
   else
     local item = utils.get_item(element)
     local group_path = utils.get_group_path(element)
-    local index = utils.get_item_index(element)
 
     if not item or not group_path then return end
 
     local name = vim.fn.fnamemodify(item.path, ':t')
 
     dialogs.confirm("Remove '" .. name .. "' from group?", function()
-      local ok, err = items_module.remove_item(group_path, index)
+      local ok, err = items_module.remove_item(group_path, item.path)
       if ok then
         utils.refresh_panels(mp_state, constants.PANEL.ITEMS)
       else
@@ -299,8 +298,8 @@ function M.handle_move(mp_state)
 
   local element = mp_state:get_element_at_cursor()
   local from_group = utils.get_group_path(element)
-  local index = utils.get_item_index(element)
-  if not from_group then return end
+  local item = utils.get_item(element)
+  if not from_group or not item then return end
 
   local groups = groups_module.get_group_list()
   -- Filter out current group
@@ -315,7 +314,7 @@ function M.handle_move(mp_state)
 
   dialogs.select("Move to group", groups, function(_, to_group)
     if to_group then
-      local ok, err = items_module.move_item(from_group, index, to_group)
+      local ok, err = items_module.move_item(from_group, item.path, to_group)
       if ok then
         logger.info("Moved to %s", to_group)
         utils.refresh_panels(mp_state, constants.PANEL.ITEMS)

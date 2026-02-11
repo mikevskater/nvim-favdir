@@ -29,10 +29,14 @@ function M.handle_open_split(mp_state, split_cmd)
   mp_state:close()
 
   vim.cmd(split_cmd)
+  local escaped = vim.fn.fnameescape(item.path)
   if item.type == constants.ITEM_TYPE.DIR then
-    vim.cmd.cd(item.path)
+    local data_module = require("nvim-favdir.state.data")
+    local config = data_module.get_config()
+    local cd_cmd = config and config.cd_command or "cd"
+    vim.cmd[cd_cmd](escaped)
   else
-    vim.cmd.edit(item.path)
+    vim.cmd.edit(escaped)
   end
 end
 

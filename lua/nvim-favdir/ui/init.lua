@@ -19,6 +19,21 @@ local dir_cache = require("nvim-favdir.state.dir_cache")
 ---@type MultiPanelState?
 local panel_state = nil
 
+---Save cursor positions and focused panel to UI state
+---@param ps MultiPanelState
+local function save_panel_state(ps)
+  if not ps then return end
+  pcall(function()
+    local row_l, col_l = ps:get_cursor("groups")
+    local row_r, col_r = ps:get_cursor("items")
+    local uis = state_module.load_ui_state()
+    uis.left_cursor = { row = row_l, col = col_l }
+    uis.right_cursor = { row = row_r, col = col_r }
+    uis.focused_panel = ps.focused_panel == "items" and "right" or "left"
+    state_module.save_ui_state(uis)
+  end)
+end
+
 -- ============================================================================
 -- Public API
 -- ============================================================================
@@ -80,14 +95,7 @@ end
 ---@return table<string, function>
 local function build_keymaps(keys, ps)
   local close_handler = function()
-    local row_l, col_l = ps:get_cursor("groups")
-    local row_r, col_r = ps:get_cursor("items")
-    local uis = state_module.load_ui_state()
-    uis.left_cursor = { row = row_l, col = col_l }
-    uis.right_cursor = { row = row_r, col = col_r }
-    uis.focused_panel = ps.focused_panel == "items" and "right" or "left"
-    state_module.save_ui_state(uis)
-    dir_cache.clear()
+    save_panel_state(ps)
     ps:close()
   end
 
@@ -160,6 +168,7 @@ function M.show(config)
     initial_focus = (state_module.load_ui_state().focused_panel == "right") and "items" or "groups",
     controls = build_controls(keys),
     on_close = function()
+      save_panel_state(panel_state)
       dir_cache.clear()
       panel_state = nil
     end,
@@ -217,6 +226,7 @@ end
 ---@param config FavdirConfig
 function M.toggle(config)
   if panel_state and panel_state:is_valid() then
+    save_panel_state(panel_state)
     panel_state:close()
   else
     M.show(config)

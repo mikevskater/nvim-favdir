@@ -67,11 +67,14 @@ function M.on_item_interact(element, mp_state)
   -- Close the UI first
   mp_state:close()
 
+  local escaped = vim.fn.fnameescape(item.path)
   if item.type == constants.ITEM_TYPE.DIR then
-    vim.cmd.cd(item.path)
+    local config = data_module.get_config()
+    local cd_cmd = config and config.cd_command or "cd"
+    vim.cmd[cd_cmd](escaped)
     logger.info("Changed to: %s", item.path)
   else
-    vim.cmd.edit(item.path)
+    vim.cmd.edit(escaped)
   end
 end
 

@@ -87,6 +87,10 @@ function M.add_group(parent_path, name)
     return false, "Group name cannot be empty"
   end
 
+  if name:find(".", 1, true) then
+    return false, "Group name cannot contain dots"
+  end
+
   local data = data_module.load_data()
   local target_list
 
@@ -114,6 +118,7 @@ function M.add_group(parent_path, name)
     items = {},
     order = utils.get_next_order(target_list),
     children = {},
+    dir_links = {},
   })
 
   data_module.save_data(data)
@@ -150,7 +155,7 @@ function M.remove_group(group_path)
   -- Update UI state to remove from expanded groups
   local ui_state = data_module.load_ui_state()
   ui_state.expanded_groups = vim.tbl_filter(function(path)
-    return not vim.startswith(path, group_path)
+    return path ~= group_path and not vim.startswith(path, group_path .. ".")
   end, ui_state.expanded_groups)
   data_module.save_ui_state(ui_state)
 
@@ -167,6 +172,10 @@ end
 function M.rename_group(group_path, new_name)
   if not new_name or new_name == "" then
     return false, "Name cannot be empty"
+  end
+
+  if new_name:find(".", 1, true) then
+    return false, "Group name cannot contain dots"
   end
 
   local data = data_module.load_data()
@@ -194,6 +203,15 @@ function M.rename_group(group_path, new_name)
     group_path,
     new_path
   )
+
+  -- Update last_selected_group if it was the renamed group or a descendant
+  if ui_state.last_selected_group == group_path then
+    ui_state.last_selected_group = new_path
+  elseif ui_state.last_selected_group and vim.startswith(ui_state.last_selected_group, group_path .. ".") then
+    local suffix = ui_state.last_selected_group:sub(#group_path + 2)
+    ui_state.last_selected_group = new_path .. "." .. suffix
+  end
+
   data_module.save_ui_state(ui_state)
 
   data_module.save_data(data)
