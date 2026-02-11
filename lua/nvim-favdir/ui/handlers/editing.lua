@@ -257,7 +257,7 @@ function M.handle_rename(mp_state)
     end)
   else
     -- Right panel: set display name (nickname) for items in group view
-    if mp_state._is_dir_link_view then
+    if mp_state._favdir.is_dir_link_view then
       logger.info("Cannot rename directory contents")
       return
     end

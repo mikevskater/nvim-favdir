@@ -52,6 +52,9 @@ function M.handle_enter(mp_state)
     local node = utils.get_node(element)
     if not node then return end
 
+    -- Clear filter when switching groups/dir_links
+    mp_state._favdir.active_filter = nil
+
     utils.modify_ui_state(function(ui_state)
       -- Reset browse state when selecting anything on left panel
       ui_state.is_browsing_directory = false
@@ -109,13 +112,16 @@ function M.handle_browse_folder(mp_state)
     return
   end
 
+  -- Clear filter when navigating into a folder
+  mp_state._favdir.active_filter = nil
+
   local ui_state = data_module.load_ui_state()
 
   utils.modify_ui_state(function(state)
     if state.is_browsing_directory then
       -- Already in browse mode (from opening a directory item) - navigate deeper
       state.browse_current_path = item.path
-    elseif mp_state._is_dir_link_view then
+    elseif mp_state._favdir.is_dir_link_view then
       -- In dir_link view (selected from left panel) - navigate deeper
       state.dir_link_current_path = item.path
     else
@@ -140,12 +146,12 @@ function M.handle_go_up(mp_state)
   local focused = utils.get_focused_panel(mp_state)
 
   -- Only works on items panel when in browse mode
-  if focused ~= constants.PANEL.ITEMS or not mp_state._is_dir_link_view then
+  if focused ~= constants.PANEL.ITEMS or not mp_state._favdir.is_dir_link_view then
     return
   end
 
-  local base_path = mp_state._dir_link_base_path
-  local current_path = mp_state._dir_link_current_path
+  local base_path = mp_state._favdir.dir_link_base_path
+  local current_path = mp_state._favdir.dir_link_current_path
 
   if not base_path or not current_path then
     return
@@ -154,6 +160,9 @@ function M.handle_go_up(mp_state)
   -- Normalize paths for comparison
   local base_normalized = vim.fn.fnamemodify(base_path, ':p')
   local current_normalized = vim.fn.fnamemodify(current_path, ':p')
+
+  -- Clear filter when navigating up
+  mp_state._favdir.active_filter = nil
 
   -- Check if already at base path
   if base_normalized == current_normalized then
@@ -274,6 +283,38 @@ function M.handle_yank_path(mp_state)
     vim.fn.setreg('"', path)
     logger.info("Copied: %s", path)
   end
+end
+
+-- ============================================================================
+-- Filter Handler
+-- ============================================================================
+
+---Handle filter (/ key) - open input to filter right panel items
+---@param mp_state MultiPanelState
+function M.handle_filter(mp_state)
+  local nvim_float = require("nvim-float")
+  local current = mp_state._favdir.active_filter or ""
+  nvim_float.create_form({
+    title = " Filter ",
+    width = 50,
+    zindex = nvim_float.ZINDEX.MODAL,
+    fields = {
+      {
+        name = "value",
+        label = "Pattern:",
+        type = "text",
+        value = current,
+        placeholder = "Type to filter (empty to clear)...",
+        width = 30,
+      },
+    },
+    on_submit = function(values)
+      local value = values.value or ""
+      mp_state._favdir.active_filter = (value ~= "") and value or nil
+      mp_state:render_panel(constants.PANEL.ITEMS)
+    end,
+    -- on_cancel: keep existing filter unchanged
+  })
 end
 
 return M

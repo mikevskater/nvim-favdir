@@ -34,6 +34,7 @@ local logger = require("nvim-favdir.logger")
 ---@field refresh string Refresh/reload all panels
 ---@field collapse_all string Collapse all groups
 ---@field toggle_hidden string Toggle hidden files in directory views
+---@field filter string Filter items in right panel
 ---@field close string Close UI
 ---@field close_alt string Alternative close key
 
@@ -94,6 +95,7 @@ M.config = {
     refresh = "R",
     collapse_all = "zM",
     toggle_hidden = ".",
+    filter = "/",
     -- Window
     close = "q",
     close_alt = "<Esc>",

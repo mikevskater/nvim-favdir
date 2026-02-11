@@ -129,6 +129,8 @@ function M.render_right_panel(mp_state)
   local ContentBuilder = require("nvim-float.content")
   local cb = ContentBuilder.new()
 
+  local filter_str = mp_state._favdir.active_filter and (" [/" .. mp_state._favdir.active_filter .. "]") or ""
+
   -- Check if we're in directory browse mode (from opening a directory item)
   if ui_state.is_browsing_directory and ui_state.browse_base_path then
     local base_path = ui_state.browse_base_path
@@ -137,7 +139,7 @@ function M.render_right_panel(mp_state)
     local dir_asc = ui_state.dir_sort_asc ~= false
     local dir_name = vim.fn.fnamemodify(current_path, ':t')
     set_panel_title(mp_state, constants.PANEL.ITEMS,
-      " " .. dir_name .. sort_indicator(dir_mode, dir_asc) .. " ")
+      " " .. dir_name .. sort_indicator(dir_mode, dir_asc) .. filter_str .. " ")
     return directory.render_dir_link_contents(mp_state, cb, base_path, current_path)
   end
 
@@ -149,16 +151,16 @@ function M.render_right_panel(mp_state)
     local dir_asc = ui_state.dir_sort_asc ~= false
     local dir_name = vim.fn.fnamemodify(current_path, ':t')
     set_panel_title(mp_state, constants.PANEL.ITEMS,
-      " " .. dir_name .. sort_indicator(dir_mode, dir_asc) .. " ")
+      " " .. dir_name .. sort_indicator(dir_mode, dir_asc) .. filter_str .. " ")
     return directory.render_dir_link_contents(mp_state, cb, base_path, current_path)
   end
 
   -- Otherwise, render group items (original behavior)
   -- Reset dir_link view flags since we're viewing regular group items
-  mp_state._is_dir_link_view = false
-  mp_state._dir_link_base_path = nil
-  mp_state._dir_link_current_path = nil
-  mp_state._sorted_items = {}
+  mp_state._favdir.is_dir_link_view = false
+  mp_state._favdir.dir_link_base_path = nil
+  mp_state._favdir.dir_link_current_path = nil
+  mp_state._favdir.sorted_items = {}
 
   local data = data_module.load_data()
   local group_path = ui_state.last_selected_group
@@ -190,8 +192,33 @@ function M.render_right_panel(mp_state)
   local sort_asc = ui_state.right_sort_asc ~= false -- default to true
   table.sort(items, sort_comparators.item_comparator(sort_mode, sort_asc))
 
-  -- Store sorted items for operations that need index
-  mp_state._sorted_items = items
+  -- Apply filter if active
+  local filter = mp_state._favdir.active_filter
+  if filter then
+    local filtered = {}
+    local filter_lower = filter:lower()
+    for _, item in ipairs(items) do
+      local path_for_name = item.path:gsub("[/\\]+$", "")
+      local name = (item.display_name or vim.fn.fnamemodify(path_for_name, ':t')):lower()
+      if name:find(filter_lower, 1, true) then
+        table.insert(filtered, item)
+      end
+    end
+    if #filtered == 0 then
+      cb:muted("No matches for '/" .. filter .. "'")
+      cb:muted("Press '/' to change or clear filter.")
+      mp_state:set_panel_content_builder(constants.PANEL.ITEMS, cb)
+      -- Still update title with filter indicator
+      local group_display = group.display_name or group.name
+      set_panel_title(mp_state, constants.PANEL.ITEMS,
+        " " .. group_display .. sort_indicator(sort_mode, sort_asc) .. filter_str .. " ")
+      return cb:build_lines(), cb:build_highlights()
+    end
+    items = filtered
+  end
+
+  -- Store sorted (and filtered) items for operations that need index
+  mp_state._favdir.sorted_items = items
 
   for idx, item in ipairs(items) do
     local icon, color
@@ -261,10 +288,10 @@ function M.render_right_panel(mp_state)
 
   mp_state:set_panel_content_builder(constants.PANEL.ITEMS, cb)
 
-  -- Update right panel title with group name and sort indicator
+  -- Update right panel title with group name, sort indicator, and filter
   local group_display = group.display_name or group.name
   set_panel_title(mp_state, constants.PANEL.ITEMS,
-    " " .. group_display .. sort_indicator(sort_mode, sort_asc) .. " ")
+    " " .. group_display .. sort_indicator(sort_mode, sort_asc) .. filter_str .. " ")
 
   return cb:build_lines(), cb:build_highlights()
 end

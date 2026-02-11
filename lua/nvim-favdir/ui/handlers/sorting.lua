@@ -226,7 +226,7 @@ end
 ---@param group_path string
 ---@return boolean success
 local function freeze_items_order(mp_state, group_path)
-  local sorted_items = mp_state._sorted_items
+  local sorted_items = mp_state._favdir.sorted_items
   if not sorted_items then return false end
 
   -- Update order fields to match current display order
@@ -350,7 +350,7 @@ local function handle_reorder(mp_state, direction)
     local index = utils.get_item_index(element)
     if not group_path or not index then return end
 
-    local items_count = mp_state._sorted_items and #mp_state._sorted_items or 0
+    local items_count = mp_state._favdir.sorted_items and #mp_state._favdir.sorted_items or 0
 
     if can_reorder(index, items_count, direction) then
       local row = mp_state:get_cursor(constants.PANEL.ITEMS)

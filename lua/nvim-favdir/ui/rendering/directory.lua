@@ -94,9 +94,22 @@ local function render_entries(mp_state, cb, base_path, current_path, raw_entries
   local sort_asc = ui_state.dir_sort_asc ~= false -- default to true
   table.sort(items, sort_comparators.directory_comparator(sort_mode, sort_asc))
 
+  -- Apply filter if active (always keep ".." parent entry)
+  local filter = mp_state._favdir.active_filter
+  if filter then
+    local filtered = {}
+    local filter_lower = filter:lower()
+    for _, item in ipairs(items) do
+      if item.type == constants.ITEM_TYPE.PARENT or item.name:lower():find(filter_lower, 1, true) then
+        table.insert(filtered, item)
+      end
+    end
+    items = filtered
+  end
+
   -- Store for operations
-  mp_state._sorted_items = items
-  mp_state._is_dir_link_view = true
+  mp_state._favdir.sorted_items = items
+  mp_state._favdir.is_dir_link_view = true
 
   if #raw_entries == 0 and not show_parent_entry then
     cb:muted("Directory is empty")
@@ -171,8 +184,8 @@ function M.render_dir_link_contents(mp_state, cb, base_path, current_path)
   end
 
   -- Store base path for navigation validation
-  mp_state._dir_link_base_path = base_path
-  mp_state._dir_link_current_path = current_path
+  mp_state._favdir.dir_link_base_path = base_path
+  mp_state._favdir.dir_link_current_path = current_path
 
   -- Fast path: entries are cached
   local cached_entries = dir_cache.get(current_path)
@@ -181,8 +194,8 @@ function M.render_dir_link_contents(mp_state, cb, base_path, current_path)
   end
 
   -- Slow path: show loading placeholder and read asynchronously
-  mp_state._is_dir_link_view = true
-  mp_state._sorted_items = {}
+  mp_state._favdir.is_dir_link_view = true
+  mp_state._favdir.sorted_items = {}
   cb:muted("Loading...")
   mp_state:set_panel_content_builder(constants.PANEL.ITEMS, cb)
 

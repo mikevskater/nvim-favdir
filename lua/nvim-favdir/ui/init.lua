@@ -86,6 +86,7 @@ local function build_controls(keys)
         { key = keys.refresh, desc = "Refresh" },
         { key = keys.collapse_all, desc = "Collapse all groups" },
         { key = keys.toggle_hidden, desc = "Toggle hidden files" },
+        { key = keys.filter, desc = "Filter items" },
       },
     },
     {
@@ -132,6 +133,7 @@ local function build_keymaps(keys, ps)
     [keys.refresh] = function() navigation.handle_refresh(ps) end,
     [keys.collapse_all] = function() navigation.handle_collapse_all(ps) end,
     [keys.toggle_hidden] = function() navigation.handle_toggle_hidden(ps) end,
+    [keys.filter] = function() navigation.handle_filter(ps) end,
     [keys.open_split] = function() opening.handle_open_split(ps, "split") end,
     [keys.open_vsplit] = function() opening.handle_open_split(ps, "vsplit") end,
     [keys.open_tab] = function() opening.handle_open_split(ps, "tabnew") end,
@@ -189,6 +191,15 @@ function M.show(config)
     logger.error("Failed to create favorites UI")
     return
   end
+
+  -- Initialize private namespace to avoid collisions with nvim-float internals
+  panel_state._favdir = {
+    sorted_items = {},
+    is_dir_link_view = false,
+    dir_link_base_path = nil,
+    dir_link_current_path = nil,
+    active_filter = nil,
+  }
 
   logger.debug("Created multi-panel UI")
 
