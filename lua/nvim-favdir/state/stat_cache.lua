@@ -8,7 +8,7 @@ local M = {}
 -- ============================================================================
 
 ---@class StatCacheEntry
----@field stat table? The stat result from vim.loop.fs_stat
+---@field stat table? The stat result from vim.uv.fs_stat
 ---@field timestamp number When this entry was cached (os.time())
 ---@field pending boolean Whether a fetch is in progress
 
@@ -132,7 +132,7 @@ function M.fetch_async(path, callback)
   cache.pending_callbacks[path] = { callback }
 
   -- Async stat call
-  vim.loop.fs_stat(path, function(err, stat)
+  vim.uv.fs_stat(path, function(err, stat)
     vim.schedule(function()
       -- Update cache
       cache.entries[path] = {
@@ -211,7 +211,7 @@ function M.get_sync(path)
   end
 
   -- Blocking fallback
-  local ok, stat = pcall(vim.loop.fs_stat, path)
+  local ok, stat = pcall(vim.uv.fs_stat, path)
   local result = ok and stat or nil
 
   -- Cache the result

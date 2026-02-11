@@ -116,6 +116,7 @@ function M.render_right_panel(mp_state)
   mp_state._is_dir_link_view = false
   mp_state._dir_link_base_path = nil
   mp_state._dir_link_current_path = nil
+  mp_state._sorted_items = {}
 
   local data = data_module.load_data()
   local group_path = ui_state.last_selected_group

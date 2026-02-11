@@ -112,7 +112,7 @@ function M.handle_browse_folder(mp_state)
   local ui_state = data_module.load_ui_state()
 
   utils.modify_ui_state(function(state)
-    if ui_state.is_browsing_directory then
+    if state.is_browsing_directory then
       -- Already in browse mode (from opening a directory item) - navigate deeper
       state.browse_current_path = item.path
     elseif mp_state._is_dir_link_view then
@@ -180,9 +180,8 @@ function M.handle_go_up(mp_state)
   dir_cache.invalidate_children(parent_path)
 
   -- Update current path in UI state
-  local ui_state = data_module.load_ui_state()
   utils.modify_ui_state(function(state)
-    if ui_state.is_browsing_directory then
+    if state.is_browsing_directory then
       state.browse_current_path = parent_path
     else
       state.dir_link_current_path = parent_path

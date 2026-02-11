@@ -45,6 +45,7 @@ local logger = require("nvim-favdir.logger")
 ---@field use_nerd_font boolean Use Nerd Font icons
 ---@field debug_mode boolean Enable debug logging (default: false)
 ---@field log_to_file boolean Write logs to file (default: false)
+---@field cd_command "cd"|"lcd"|"tcd" Command to change directory (default: "lcd")
 ---@field keymaps FavdirKeymaps Keymaps configuration
 
 ---@type FavdirConfig
@@ -59,6 +60,7 @@ M.config = {
   use_nerd_font = true,
   debug_mode = false,
   log_to_file = false,
+  cd_command = "lcd",
   keymaps = {
     -- Global
     open = "<leader>ofd",

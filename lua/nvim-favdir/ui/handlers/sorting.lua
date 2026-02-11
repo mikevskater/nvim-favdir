@@ -36,7 +36,7 @@ local function collect_directory_paths(dir_path)
   local ok, entries = pcall(vim.fn.readdir, dir_path)
   if ok and entries then
     for _, entry in ipairs(entries) do
-      table.insert(paths, dir_path .. "/" .. entry)
+      table.insert(paths, vim.fs.joinpath(dir_path, entry))
     end
   end
   return paths

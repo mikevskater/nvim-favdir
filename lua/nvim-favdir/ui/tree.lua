@@ -38,7 +38,8 @@ function M.build_tree(data, ui_state)
   local function collect(groups, prefix, level)
     -- Sort by order
     local sorted = vim.tbl_values(groups)
-    table.sort(sorted, sort_comparators.group_comparator("custom", left_sort_asc))
+    local left_sort_mode = ui_state.left_sort_mode or "custom"
+    table.sort(sorted, sort_comparators.group_comparator(left_sort_mode, left_sort_asc))
 
     for _, group in ipairs(sorted) do
       local path = prefix == "" and group.name or (prefix .. "." .. group.name)

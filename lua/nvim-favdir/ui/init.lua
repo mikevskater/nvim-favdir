@@ -81,6 +81,14 @@ local function build_controls(keys)
       },
     },
     {
+      header = "View",
+      keys = {
+        { key = keys.refresh, desc = "Refresh" },
+        { key = keys.collapse_all, desc = "Collapse all groups" },
+        { key = keys.toggle_hidden, desc = "Toggle hidden files" },
+      },
+    },
+    {
       header = "Window",
       keys = {
         { key = keys.close .. "/" .. keys.close_alt, desc = "Close" },
@@ -121,6 +129,9 @@ local function build_keymaps(keys, ps)
     [keys.reorder_up] = function() sorting.handle_move_up(ps) end,
     [keys.reorder_down] = function() sorting.handle_move_down(ps) end,
     [keys.yank_path] = function() navigation.handle_yank_path(ps) end,
+    [keys.refresh] = function() navigation.handle_refresh(ps) end,
+    [keys.collapse_all] = function() navigation.handle_collapse_all(ps) end,
+    [keys.toggle_hidden] = function() navigation.handle_toggle_hidden(ps) end,
     [keys.open_split] = function() opening.handle_open_split(ps, "split") end,
     [keys.open_vsplit] = function() opening.handle_open_split(ps, "vsplit") end,
     [keys.open_tab] = function() opening.handle_open_split(ps, "tabnew") end,
