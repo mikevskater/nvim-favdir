@@ -149,6 +149,10 @@
       open_split = "<C-s>",
       open_vsplit = "|",
       open_tab = "<C-t>",
+      yank_path = "y",
+      refresh = "R",
+      collapse_all = "zM",
+      toggle_hidden = ".",
       close = "q",
       close_alt = "<Esc>",
     }
@@ -284,6 +288,7 @@ require('nvim-favdir').setup({
 | `default_groups` | string[] | `{}` | Groups created on first run |
 | `protected_groups` | string[] | `{}` | Groups that cannot be deleted |
 | `use_nerd_font` | boolean | `true` | Use Nerd Font icons |
+| `cd_command` | string | `"lcd"` | Directory change command (`"cd"`, `"lcd"`, `"tcd"`) |
 | `debug_mode` | boolean | `false` | Enable debug logging |
 
 <details>
@@ -358,9 +363,10 @@ All keymaps are customizable via the `keymaps` option in setup.
 |:----|:-----------|:------------|
 | `a` | Add group or dir link | Add item to group |
 | `d` | Delete group/dir link | Remove item |
-| `r` | Rename group | — |
+| `r` | Rename / set nickname | Set item display name |
 | `m` | — | Move item to group |
 | `M` | Move group to parent | — |
+| `y` | Copy group path | Copy item path |
 
 <p align="center">
   <img src="./assets/groups.gif" alt="Group management demo" width="800">
@@ -385,6 +391,17 @@ All keymaps are customizable via the `keymaps` option in setup.
 <p align="center">
   <img src="./assets/sorting.gif" alt="Sorting demo" width="800">
 </p>
+
+</details>
+
+<details>
+<summary><b>View</b></summary>
+
+| Key | Action |
+|:----|:-------|
+| `R` | Refresh all panels (reload data, clear caches) |
+| `zM` | Collapse all expanded groups |
+| `.` | Toggle hidden files (dotfiles) in directory views |
 
 </details>
 

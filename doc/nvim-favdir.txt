@@ -2,7 +2,7 @@
 
 Author:   mikevskater
 License:  MIT
-Version:  1.3.1
+Version:  1.4.0
 
 ==============================================================================
 CONTENTS                                                    *nvim-favdir-contents*
@@ -152,6 +152,15 @@ log_to_file                                              *favdir.log_to_file*
     Write debug logs to file instead of notifications.
     Log file: `~/.local/share/nvim/favdir.log`
 
+cd_command                                                *favdir.cd_command*
+    Type: `"cd"|"lcd"|"tcd"`
+    Default: `"lcd"`
+
+    Command used to change directory when opening a directory item.
+    - `"cd"` — Change global working directory
+    - `"lcd"` — Change window-local working directory (recommended)
+    - `"tcd"` — Change tab-local working directory
+
 keymaps                                                    *favdir.keymaps*
     Type: `table`
 
@@ -177,6 +186,32 @@ keymaps                                                    *favdir.keymaps*
 :FavdirAddFile
     Add the current buffer's file to favorites.
     Prompts for group selection.
+
+                                                          *:FavdirSandbox*
+:FavdirSandbox
+    Open the UI in sandbox mode. Uses a clean, in-memory data state that
+    is not persisted to disk. Useful for demos, testing, and VHS recordings.
+
+FEATURES~
+                                                    *nvim-favdir-display-names*
+Display Names (Nicknames):~
+    Groups and items can have display names (nicknames) that are shown in
+    the UI instead of their actual name/filename. Use `r` to set a display
+    name on groups or items. Clear a display name by setting it to empty
+    or the original name.
+
+                                                     *nvim-favdir-browse-mode*
+Browse Mode:~
+    Press `o` on a directory item in the right panel to enter browse mode.
+    This shows the directory contents inline, with `..` entries to navigate
+    up. Press `<BS>` to go up one level. When at the top level of browse
+    mode, `<BS>` exits back to the group items view.
+
+                                                    *nvim-favdir-dir-links*
+Directory Links:~
+    Directory links are shown in the left panel under their parent group.
+    Selecting a directory link shows its filesystem contents in the right
+    panel. Navigate into subdirectories with `o` and back with `<BS>`.
 
 ==============================================================================
 6. KEYMAPS                                                  *nvim-favdir-keymaps*
@@ -205,6 +240,10 @@ Default keymaps:~
       open_split = "<C-s>",
       open_vsplit = "|",
       open_tab = "<C-t>",
+      yank_path = "y",
+      refresh = "R",
+      collapse_all = "zM",
+      toggle_hidden = ".",
       close = "q",
       close_alt = "<Esc>",
     }
@@ -224,9 +263,10 @@ Action keymaps:~
     Key             Left Panel              Right Panel~
     `a`             Add group or dir link   Add item to group
     `d`             Delete group/dir link   Remove item
-    `r`             Rename group            -
+    `r`             Rename / set nickname   Set item display name
     `m`             -                       Move item to group
     `M`             Move group to parent    -
+    `y`             Copy group path         Copy item path
 
 Sorting keymaps:~
 
@@ -242,6 +282,13 @@ Opening keymaps (right panel only):~
     `<C-s>`         Open in horizontal split
     `|`             Open in vertical split
     `<C-t>`         Open in new tab
+
+View keymaps:~
+
+    Key             Action~
+    `R`             Refresh all panels (reload data, clear caches)
+    `zM`            Collapse all expanded groups
+    `.`             Toggle hidden files (dotfiles) in directory views
 
 Window keymaps:~
 
