@@ -60,6 +60,7 @@ local base_icons = {
   leaf       = { nerd = "•",           ascii = " - " },  -- Bullet for leaf nodes
   directory  = { nerd = nf(0xF07B),    ascii = "[D]" },  -- nf-fa-folder
   file       = { nerd = nf(0xF15B),    ascii = "[F]" },  -- nf-fa-file
+  warning    = { nerd = nf(0xF071),    ascii = "!" },    -- nf-fa-warning
 }
 
 -- File extension icons with colors (from nvim-web-devicons)

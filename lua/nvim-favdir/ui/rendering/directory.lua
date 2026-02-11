@@ -73,14 +73,20 @@ local function render_entries(mp_state, cb, base_path, current_path, raw_entries
     })
   end
 
+  -- Filter hidden files unless show_hidden_files is enabled
+  local show_hidden = ui_state.show_hidden_files ~= false
   for _, entry in ipairs(raw_entries) do
-    local full_path = current_path .. "/" .. entry
+    if not show_hidden and entry:sub(1, 1) == "." then
+      goto continue
+    end
+    local full_path = vim.fs.joinpath(current_path, entry)
     local is_dir = vim.fn.isdirectory(full_path) == 1
     table.insert(items, {
       name = entry,
       path = full_path,
       type = is_dir and constants.ITEM_TYPE.DIR or constants.ITEM_TYPE.FILE,
     })
+    ::continue::
   end
 
   -- Sort based on dir_sort_mode (parent ".." always first)
@@ -189,7 +195,8 @@ function M.render_dir_link_contents(mp_state, cb, base_path, current_path)
       if ok and sync_entries then
         entries = sync_entries
       else
-        -- Render error state
+        -- Cache empty result to prevent re-render loop
+        dir_cache.set(current_path, {})
         mp_state:render_panel(constants.PANEL.ITEMS)
         return
       end

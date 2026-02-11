@@ -193,6 +193,52 @@ function M.handle_go_up(mp_state)
 end
 
 -- ============================================================================
+-- Refresh Handler
+-- ============================================================================
+
+---Handle refresh (R key) - clear all caches and re-render
+---@param mp_state MultiPanelState
+function M.handle_refresh(mp_state)
+  local sort_comparators = require("nvim-favdir.state.sort_comparators")
+  dir_cache.clear()
+  sort_comparators.clear_cache()
+  mp_state:render_panel(constants.PANEL.GROUPS)
+  mp_state:render_panel(constants.PANEL.ITEMS)
+  logger.info("Refreshed")
+end
+
+-- ============================================================================
+-- Collapse All Handler
+-- ============================================================================
+
+---Handle collapse all (zM key) - collapse all groups
+---@param mp_state MultiPanelState
+function M.handle_collapse_all(mp_state)
+  utils.modify_ui_state(function(state)
+    state.expanded_groups = {}
+  end)
+  mp_state:render_panel(constants.PANEL.GROUPS)
+  mp_state:render_panel(constants.PANEL.ITEMS)
+end
+
+-- ============================================================================
+-- Toggle Hidden Files Handler
+-- ============================================================================
+
+---Handle toggle hidden files (. key) - show/hide dotfiles in directory views
+---@param mp_state MultiPanelState
+function M.handle_toggle_hidden(mp_state)
+  utils.modify_ui_state(function(state)
+    state.show_hidden_files = not state.show_hidden_files
+  end)
+  -- Clear directory cache so hidden files are re-filtered
+  dir_cache.clear()
+  mp_state:render_panel(constants.PANEL.ITEMS)
+  local ui_state = data_module.load_ui_state()
+  logger.info("Hidden files: %s", ui_state.show_hidden_files and "shown" or "hidden")
+end
+
+-- ============================================================================
 -- Copy Path Handler
 -- ============================================================================
 

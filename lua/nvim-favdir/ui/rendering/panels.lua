@@ -16,6 +16,33 @@ local interactions = require("nvim-favdir.ui.rendering.interactions")
 directory.set_item_interact_handler(interactions.on_item_interact)
 
 -- ============================================================================
+-- Panel Title Helpers
+-- ============================================================================
+
+---Get sort mode display string
+---@param mode string Sort mode
+---@param ascending boolean
+---@return string
+local function sort_indicator(mode, ascending)
+  if mode == "custom" then return "" end
+  local arrow = ascending and "^" or "v"
+  return " [" .. mode .. " " .. arrow .. "]"
+end
+
+---Update a panel's floating window title
+---@param mp_state MultiPanelState
+---@param panel_name string
+---@param title string
+local function set_panel_title(mp_state, panel_name, title)
+  local buf = mp_state:get_panel_buffer(panel_name)
+  if not buf then return end
+  local wins = vim.fn.win_findbuf(buf)
+  if #wins > 0 then
+    pcall(vim.api.nvim_win_set_config, wins[1], { title = title })
+  end
+end
+
+-- ============================================================================
 -- Panel Rendering
 -- ============================================================================
 
@@ -85,6 +112,11 @@ function M.render_left_panel(mp_state)
 
   mp_state:set_panel_content_builder(constants.PANEL.GROUPS, cb)
 
+  -- Update left panel title with sort indicator
+  local left_mode = ui_state.left_sort_mode or "custom"
+  local left_asc = ui_state.left_sort_asc ~= false
+  set_panel_title(mp_state, constants.PANEL.GROUPS, " Groups" .. sort_indicator(left_mode, left_asc) .. " ")
+
   return cb:build_lines(), cb:build_highlights()
 end
 
@@ -101,6 +133,11 @@ function M.render_right_panel(mp_state)
   if ui_state.is_browsing_directory and ui_state.browse_base_path then
     local base_path = ui_state.browse_base_path
     local current_path = ui_state.browse_current_path or base_path
+    local dir_mode = ui_state.dir_sort_mode or "type"
+    local dir_asc = ui_state.dir_sort_asc ~= false
+    local dir_name = vim.fn.fnamemodify(current_path, ':t')
+    set_panel_title(mp_state, constants.PANEL.ITEMS,
+      " " .. dir_name .. sort_indicator(dir_mode, dir_asc) .. " ")
     return directory.render_dir_link_contents(mp_state, cb, base_path, current_path)
   end
 
@@ -108,6 +145,11 @@ function M.render_right_panel(mp_state)
   if ui_state.last_selected_type == constants.SELECTION_TYPE.DIR_LINK and ui_state.last_selected_dir_link then
     local base_path = ui_state.last_selected_dir_link
     local current_path = ui_state.dir_link_current_path or base_path
+    local dir_mode = ui_state.dir_sort_mode or "type"
+    local dir_asc = ui_state.dir_sort_asc ~= false
+    local dir_name = vim.fn.fnamemodify(current_path, ':t')
+    set_panel_title(mp_state, constants.PANEL.ITEMS,
+      " " .. dir_name .. sort_indicator(dir_mode, dir_asc) .. " ")
     return directory.render_dir_link_contents(mp_state, cb, base_path, current_path)
   end
 
@@ -122,6 +164,7 @@ function M.render_right_panel(mp_state)
   local group_path = ui_state.last_selected_group
 
   if not group_path then
+    set_panel_title(mp_state, constants.PANEL.ITEMS, " Items ")
     cb:muted("← Select a group to view items")
     mp_state:set_panel_content_builder(constants.PANEL.ITEMS, cb)
     return cb:build_lines(), cb:build_highlights()
@@ -163,6 +206,14 @@ function M.render_right_panel(mp_state)
     local path_for_name = item.path:gsub("[/\\]+$", "")  -- Remove trailing slashes
     local name = item.display_name or vim.fn.fnamemodify(path_for_name, ':t')
 
+    -- Check if path still exists
+    local path_exists
+    if item.type == constants.ITEM_TYPE.DIR then
+      path_exists = vim.fn.isdirectory(item.path) == 1
+    else
+      path_exists = vim.fn.filereadable(item.path) == 1
+    end
+
     -- Shorten home directory
     local display_path = item.path
     local home = vim.fn.expand('~')
@@ -172,8 +223,8 @@ function M.render_right_panel(mp_state)
 
     local icon_hl = icons.get_icon_hl(color)
 
-    -- Build line with element tracking
-    cb:spans({
+    -- Build spans list
+    local spans = {
       {
         text = icon .. " ",
         hl_group = icon_hl,
@@ -194,12 +245,26 @@ function M.render_right_panel(mp_state)
         },
       },
       { text = name, style = item.type == constants.ITEM_TYPE.DIR and "strong" or nil },
-      { text = " ", style = "muted" },
-      { text = display_path, style = "muted" },
-    })
+    }
+
+    -- Show warning icon for missing paths
+    if not path_exists then
+      table.insert(spans, { text = " " .. icons.get_base_icon("warning"), hl_group = "WarningMsg" })
+    end
+
+    table.insert(spans, { text = " ", style = "muted" })
+    table.insert(spans, { text = display_path, style = "muted" })
+
+    -- Build line with element tracking
+    cb:spans(spans)
   end
 
   mp_state:set_panel_content_builder(constants.PANEL.ITEMS, cb)
+
+  -- Update right panel title with group name and sort indicator
+  local group_display = group.display_name or group.name
+  set_panel_title(mp_state, constants.PANEL.ITEMS,
+    " " .. group_display .. sort_indicator(sort_mode, sort_asc) .. " ")
 
   return cb:build_lines(), cb:build_highlights()
 end

@@ -5,7 +5,7 @@
 
 local M = {}
 
-M.version = "1.3.1"
+M.version = "1.4.0"
 
 local state = require("nvim-favdir.state")
 local ui = require("nvim-favdir.ui")
@@ -31,6 +31,9 @@ local logger = require("nvim-favdir.logger")
 ---@field open_vsplit string Open in vsplit
 ---@field open_tab string Open in tab
 ---@field yank_path string Copy path to clipboard
+---@field refresh string Refresh/reload all panels
+---@field collapse_all string Collapse all groups
+---@field toggle_hidden string Toggle hidden files in directory views
 ---@field close string Close UI
 ---@field close_alt string Alternative close key
 
@@ -87,6 +90,10 @@ M.config = {
     open_tab = "<C-t>",
     -- Copy
     yank_path = "y",
+    -- Misc
+    refresh = "R",
+    collapse_all = "zM",
+    toggle_hidden = ".",
     -- Window
     close = "q",
     close_alt = "<Esc>",

@@ -50,6 +50,7 @@ local constants = require("nvim-favdir.constants")
 ---@field left_sort_asc boolean Left panel sort ascending (true) or descending (false)
 ---@field right_sort_asc boolean Right panel sort ascending
 ---@field dir_sort_asc boolean Directory view sort ascending
+---@field show_hidden_files boolean Show hidden files (dotfiles) in directory views
 
 -- ============================================================================
 -- Module State
@@ -222,6 +223,7 @@ local function create_default_ui_state()
     left_sort_asc = constants.DEFAULTS.SORT_ASCENDING,
     right_sort_asc = constants.DEFAULTS.SORT_ASCENDING,
     dir_sort_asc = constants.DEFAULTS.SORT_ASCENDING,
+    show_hidden_files = true,
   }
 end
 
