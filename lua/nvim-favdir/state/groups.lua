@@ -293,4 +293,28 @@ function M.move_group(group_path, new_parent_path)
   return true, nil
 end
 
+---Set or clear the display name (nickname) for a group
+---@param group_path string Group path
+---@param display_name string? Display name (nil or empty to clear)
+---@return boolean success
+---@return string? error_message
+function M.set_display_name(group_path, display_name)
+  local data = data_module.load_data()
+  local group = M.find_group(data, group_path)
+
+  if not group then
+    return false, "Group not found"
+  end
+
+  -- Clear display_name if empty or matches the actual group name
+  if not display_name or display_name == "" or display_name == group.name then
+    group.display_name = nil
+  else
+    group.display_name = display_name
+  end
+
+  data_module.save_data(data)
+  return true, nil
+end
+
 return M

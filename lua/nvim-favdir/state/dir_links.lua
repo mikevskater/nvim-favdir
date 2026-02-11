@@ -128,6 +128,62 @@ function M.remove_dir_link(parent_path, name)
   return false, "Directory link not found"
 end
 
+---Rename a directory link
+---@param parent_path string Parent group path
+---@param old_name string Current name of the dir_link
+---@param new_name string New name
+---@return boolean success
+---@return string? error_message
+function M.rename_dir_link(parent_path, old_name, new_name)
+  if not new_name or new_name == "" then
+    return false, "Name cannot be empty"
+  end
+
+  if not parent_path or parent_path == "" then
+    return false, "Parent path is required"
+  end
+
+  if not groups_module then
+    return false, "Groups module not initialized"
+  end
+
+  local data = data_module.load_data()
+  local parent = groups_module.find_group(data, parent_path)
+
+  if not parent then
+    return false, "Parent group not found"
+  end
+
+  if not parent.dir_links then
+    return false, "Directory link not found"
+  end
+
+  -- Check for duplicate name among siblings (dir_links + children)
+  for _, link in ipairs(parent.dir_links) do
+    if link.name == new_name and link.name ~= old_name then
+      return false, "A directory link with this name already exists"
+    end
+  end
+  if parent.children then
+    for _, child in ipairs(parent.children) do
+      if child.name == new_name then
+        return false, "A group with this name already exists"
+      end
+    end
+  end
+
+  -- Find and rename
+  for _, link in ipairs(parent.dir_links) do
+    if link.name == old_name then
+      link.name = new_name
+      data_module.save_data(data)
+      return true, nil
+    end
+  end
+
+  return false, "Directory link not found"
+end
+
 ---Find a directory link by full path (e.g., "Work.MyDocs" where MyDocs is a dir_link)
 ---@param data FavdirData
 ---@param link_path string Dot-separated path ending with dir_link name

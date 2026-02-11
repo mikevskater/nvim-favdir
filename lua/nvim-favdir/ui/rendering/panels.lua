@@ -158,9 +158,9 @@ function M.render_right_panel(mp_state)
       icon, color = icons.get_file_icon(item.path)
     end
 
-    -- Get name - for directories, remove trailing slash before getting tail
+    -- Get name - use display_name (nickname) if set, otherwise filename
     local path_for_name = item.path:gsub("[/\\]+$", "")  -- Remove trailing slashes
-    local name = vim.fn.fnamemodify(path_for_name, ':t')
+    local name = item.display_name or vim.fn.fnamemodify(path_for_name, ':t')
 
     -- Shorten home directory
     local display_path = item.path

@@ -44,6 +44,7 @@ M.add_group = groups_module.add_group
 M.remove_group = groups_module.remove_group
 M.rename_group = groups_module.rename_group
 M.move_group = groups_module.move_group
+M.set_group_display_name = groups_module.set_display_name
 
 -- ============================================================================
 -- Re-export Directory Links Module Functions
@@ -52,6 +53,7 @@ M.move_group = groups_module.move_group
 M.add_dir_link = dir_links_module.add_dir_link
 M.remove_dir_link = dir_links_module.remove_dir_link
 M.find_dir_link = dir_links_module.find_dir_link
+M.rename_dir_link = dir_links_module.rename_dir_link
 
 -- ============================================================================
 -- Re-export Items Module Functions
@@ -60,6 +62,7 @@ M.find_dir_link = dir_links_module.find_dir_link
 M.add_item = items_module.add_item
 M.remove_item = items_module.remove_item
 M.move_item = items_module.move_item
+M.set_item_display_name = items_module.set_display_name
 
 -- ============================================================================
 -- Re-export Sorting Module Functions

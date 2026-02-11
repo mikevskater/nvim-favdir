@@ -211,24 +211,75 @@ function M.handle_rename(mp_state)
     local node = utils.get_node(element)
     if not node then return end
 
-    -- Directory links cannot be renamed (delete and re-add instead)
     if node.is_dir_link then
-      logger.info("Cannot rename directory links (use 'd' to remove and 'a' to add)")
+      -- Rename directory link
+      dialogs.input("Rename Directory Link", "New Name:", node.name, function(new_name)
+        if not new_name or new_name == "" or new_name == node.name then return end
+        local parent_path = path_utils.get_parent_path(node.full_path)
+        local ok, err = dir_links_module.rename_dir_link(parent_path, node.dir_link.name, new_name)
+        if ok then
+          utils.refresh_panels(mp_state, "both")
+        else
+          logger.error(err or "Failed to rename directory link")
+        end
+      end)
       return
     end
 
-    dialogs.input("Rename Group", "New Name:", node.name, function(new_name)
-      if new_name ~= node.name then
-        local ok, err = groups_module.rename_group(node.full_path, new_name)
-        if ok then
-          utils.refresh_panels(mp_state, constants.PANEL.GROUPS)
-        else
-          logger.error(err or "Failed to rename group")
-        end
+    -- Group: offer display name or actual rename
+    local options = { "Set display name", "Rename group" }
+    dialogs.select("Rename '" .. node.name .. "'", options, function(idx, choice)
+      if not choice then return end
+
+      if choice == "Set display name" then
+        local default_value = node.group and node.group.display_name or node.group.name
+        dialogs.input("Set Display Name", "Display Name:", default_value, function(new_name)
+          if not new_name then return end
+          local ok, err = groups_module.set_display_name(node.full_path, new_name)
+          if ok then
+            utils.refresh_panels(mp_state, constants.PANEL.GROUPS)
+          else
+            logger.error(err or "Failed to set display name")
+          end
+        end)
+      else
+        -- Rename group (changes actual name and all paths)
+        dialogs.input("Rename Group", "New Name:", node.group.name, function(new_name)
+          if new_name and new_name ~= node.group.name then
+            local ok, err = groups_module.rename_group(node.full_path, new_name)
+            if ok then
+              utils.refresh_panels(mp_state, constants.PANEL.GROUPS)
+            else
+              logger.error(err or "Failed to rename group")
+            end
+          end
+        end)
       end
     end)
   else
-    logger.info("Cannot rename items (use 'd' to remove and 'a' to add)")
+    -- Right panel: set display name (nickname) for items in group view
+    if mp_state._is_dir_link_view then
+      logger.info("Cannot rename directory contents")
+      return
+    end
+
+    local element = mp_state:get_element_at_cursor()
+    local item = utils.get_item(element)
+    local group_path = utils.get_group_path(element)
+    if not item or not group_path then return end
+
+    local filename = vim.fn.fnamemodify(item.path:gsub("[/\\]+$", ""), ':t')
+    local default_value = item.display_name or filename
+
+    dialogs.input("Set Display Name", "Name:", default_value, function(new_name)
+      if not new_name then return end
+      local ok, err = items_module.set_display_name(group_path, item.path, new_name)
+      if ok then
+        utils.refresh_panels(mp_state, constants.PANEL.ITEMS)
+      else
+        logger.error(err or "Failed to set display name")
+      end
+    end)
   end
 end
 

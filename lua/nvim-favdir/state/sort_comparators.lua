@@ -201,10 +201,7 @@ function M.item_comparator(mode, ascending)
     get_type = function(item) return item.type or "file" end,
     get_order = function(item) return item.order or 0 end,
     get_name = function(item)
-      if item.path then
-        return vim.fn.fnamemodify(item.path, ':t')
-      end
-      return ""
+      return item.display_name or (item.path and vim.fn.fnamemodify(item.path, ':t') or "")
     end,
   })
 end
@@ -220,7 +217,7 @@ function M.group_comparator(mode, ascending)
     get_path = function(_) return "" end, -- Groups don't have filesystem paths
     get_type = function(_) return "group" end,
     get_order = function(group) return group.order or 0 end,
-    get_name = function(group) return group.name or "" end,
+    get_name = function(group) return group.display_name or group.name or "" end,
   })
 end
 

@@ -47,7 +47,7 @@ function M.build_tree(data, ui_state)
       local is_expanded = state_data.is_expanded(ui_state, path)
 
       table.insert(nodes, {
-        name = group.name,
+        name = group.display_name or group.name,
         full_path = path,
         level = level,
         is_expanded = is_expanded,

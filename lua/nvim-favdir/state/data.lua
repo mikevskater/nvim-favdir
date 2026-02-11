@@ -14,6 +14,7 @@ local constants = require("nvim-favdir.constants")
 ---@field path string Absolute path to file or directory
 ---@field type "dir"|"file" Item type
 ---@field order number Sort order within group
+---@field display_name string? Optional display name (nickname)
 
 ---@class FavdirDirLink
 ---@field name string Display name in left panel
@@ -22,6 +23,7 @@ local constants = require("nvim-favdir.constants")
 
 ---@class FavdirGroup
 ---@field name string Group name
+---@field display_name string? Optional display name (nickname, UI-only)
 ---@field items FavdirItem[] Files and directories in this group
 ---@field order number Sort order
 ---@field children FavdirGroup[]? Child groups (for hierarchy)

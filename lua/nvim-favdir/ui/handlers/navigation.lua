@@ -7,6 +7,7 @@ local data_module = require("nvim-favdir.state.data")
 local utils = require("nvim-favdir.ui.handlers.utils")
 local logger = require("nvim-favdir.logger")
 local constants = require("nvim-favdir.constants")
+local dir_cache = require("nvim-favdir.state.dir_cache")
 
 -- ============================================================================
 -- Navigation Handlers
@@ -175,6 +176,9 @@ function M.handle_go_up(mp_state)
   -- Go up one level
   local parent_path = vim.fn.fnamemodify(current_path, ':h')
 
+  -- Invalidate child caches to bound memory
+  dir_cache.invalidate_children(parent_path)
+
   -- Update current path in UI state
   local ui_state = data_module.load_ui_state()
   utils.modify_ui_state(function(state)
@@ -187,6 +191,44 @@ function M.handle_go_up(mp_state)
 
   -- Re-render items panel
   mp_state:render_panel(constants.PANEL.ITEMS)
+end
+
+-- ============================================================================
+-- Copy Path Handler
+-- ============================================================================
+
+---Handle yank path (y key) - copy path to clipboard
+---@param mp_state MultiPanelState
+function M.handle_yank_path(mp_state)
+  local focused = utils.get_focused_panel(mp_state)
+  local element = mp_state:get_element_at_cursor()
+  if not element or not element.data then return end
+
+  local path
+
+  if focused == constants.PANEL.GROUPS then
+    local node = utils.get_node(element)
+    if not node then return end
+
+    if node.is_dir_link then
+      -- Dir_link: copy filesystem path
+      path = node.dir_path
+    else
+      -- Group: copy dot-path (e.g., "Work.Projects")
+      path = node.full_path
+    end
+  else
+    local item = utils.get_item(element)
+    if not item then return end
+    -- Item: copy filesystem path
+    path = item.path
+  end
+
+  if path then
+    vim.fn.setreg("+", path)
+    vim.fn.setreg('"', path)
+    logger.info("Copied: %s", path)
+  end
 end
 
 return M

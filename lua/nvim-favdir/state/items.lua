@@ -119,4 +119,35 @@ function M.move_item(from_group, item_index, to_group)
   return true, nil
 end
 
+---Set or clear the display name (nickname) for an item
+---@param group_path string Group path
+---@param item_path string Path of the item to rename
+---@param display_name string? Display name (nil or empty to clear)
+---@return boolean success
+---@return string? error_message
+function M.set_display_name(group_path, item_path, display_name)
+  local data = data_module.load_data()
+  local group = groups_module.find_group(data, group_path)
+
+  if not group then
+    return false, "Group not found"
+  end
+
+  for _, item in ipairs(group.items) do
+    if item.path == item_path then
+      -- Clear display_name if empty or matches the filename
+      local filename = vim.fn.fnamemodify(item.path:gsub("[/\\]+$", ""), ':t')
+      if not display_name or display_name == "" or display_name == filename then
+        item.display_name = nil
+      else
+        item.display_name = display_name
+      end
+      data_module.save_data(data)
+      return true, nil
+    end
+  end
+
+  return false, "Item not found in group"
+end
+
 return M
