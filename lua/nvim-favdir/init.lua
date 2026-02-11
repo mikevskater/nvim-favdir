@@ -30,6 +30,7 @@ local logger = require("nvim-favdir.logger")
 ---@field open_split string Open in split
 ---@field open_vsplit string Open in vsplit
 ---@field open_tab string Open in tab
+---@field yank_path string Copy path to clipboard
 ---@field close string Close UI
 ---@field close_alt string Alternative close key
 
@@ -82,6 +83,8 @@ M.config = {
     open_split = "<C-s>",
     open_vsplit = "|",
     open_tab = "<C-t>",
+    -- Copy
+    yank_path = "y",
     -- Window
     close = "q",
     close_alt = "<Esc>",
