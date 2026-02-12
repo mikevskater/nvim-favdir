@@ -122,14 +122,24 @@ end
 
 ---Render right panel (items in selected group or directory contents for dir_link)
 ---@param mp_state MultiPanelState
----@return string[] lines
----@return table[] highlights
+---@return ContentBuilder cb
 function M.render_right_panel(mp_state)
   local ui_state = data_module.load_ui_state()
   local ContentBuilder = require("nvim-float.content")
   local cb = ContentBuilder.new()
 
-  local filter_str = mp_state._favdir.active_filter and (" [/" .. mp_state._favdir.active_filter .. "]") or ""
+  -- Inline filter input at top of panel
+  cb:embedded_input("filter", {
+    placeholder = "/ filter...",
+    value = mp_state._favdir.active_filter or "",
+    width = 25,
+    on_submit = function(_, v)
+      mp_state._favdir.active_filter = (v ~= "") and v or nil
+      mp_state:render_panel(constants.PANEL.ITEMS)
+    end,
+  })
+
+  local filter_str = ""
 
   -- Check if we're in directory browse mode (from opening a directory item)
   if ui_state.is_browsing_directory and ui_state.browse_base_path then
@@ -140,7 +150,8 @@ function M.render_right_panel(mp_state)
     local dir_name = vim.fn.fnamemodify(current_path, ':t')
     set_panel_title(mp_state, constants.PANEL.ITEMS,
       " " .. dir_name .. sort_indicator(dir_mode, dir_asc) .. filter_str .. " ")
-    return directory.render_dir_link_contents(mp_state, cb, base_path, current_path)
+    directory.render_dir_link_contents(mp_state, cb, base_path, current_path)
+    return cb
   end
 
   -- Check if a dir_link is selected
@@ -152,7 +163,8 @@ function M.render_right_panel(mp_state)
     local dir_name = vim.fn.fnamemodify(current_path, ':t')
     set_panel_title(mp_state, constants.PANEL.ITEMS,
       " " .. dir_name .. sort_indicator(dir_mode, dir_asc) .. filter_str .. " ")
-    return directory.render_dir_link_contents(mp_state, cb, base_path, current_path)
+    directory.render_dir_link_contents(mp_state, cb, base_path, current_path)
+    return cb
   end
 
   -- Otherwise, render group items (original behavior)
@@ -169,21 +181,21 @@ function M.render_right_panel(mp_state)
     set_panel_title(mp_state, constants.PANEL.ITEMS, " Items ")
     cb:muted("← Select a group to view items")
     mp_state:set_panel_content_builder(constants.PANEL.ITEMS, cb)
-    return cb:build_lines(), cb:build_highlights()
+    return cb
   end
 
   local group = groups_module.find_group(data, group_path)
   if not group then
     cb:muted("Group not found")
     mp_state:set_panel_content_builder(constants.PANEL.ITEMS, cb)
-    return cb:build_lines(), cb:build_highlights()
+    return cb
   end
 
   if #group.items == 0 then
     cb:muted("No items in this group.")
     cb:muted("Press 'a' to add current dir/file.")
     mp_state:set_panel_content_builder(constants.PANEL.ITEMS, cb)
-    return cb:build_lines(), cb:build_highlights()
+    return cb
   end
 
   -- Sort items based on right_sort_mode
@@ -212,7 +224,7 @@ function M.render_right_panel(mp_state)
       local group_display = group.display_name or group.name
       set_panel_title(mp_state, constants.PANEL.ITEMS,
         " " .. group_display .. sort_indicator(sort_mode, sort_asc) .. filter_str .. " ")
-      return cb:build_lines(), cb:build_highlights()
+      return cb
     end
     items = filtered
   end
@@ -293,7 +305,7 @@ function M.render_right_panel(mp_state)
   set_panel_title(mp_state, constants.PANEL.ITEMS,
     " " .. group_display .. sort_indicator(sort_mode, sort_asc) .. filter_str .. " ")
 
-  return cb:build_lines(), cb:build_highlights()
+  return cb
 end
 
 return M

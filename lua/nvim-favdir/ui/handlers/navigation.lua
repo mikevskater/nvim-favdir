@@ -289,32 +289,15 @@ end
 -- Filter Handler
 -- ============================================================================
 
----Handle filter (/ key) - open input to filter right panel items
+---Handle filter (/ key) - focus the embedded filter input in the items panel
 ---@param mp_state MultiPanelState
 function M.handle_filter(mp_state)
-  local nvim_float = require("nvim-float")
-  local current = mp_state._favdir.active_filter or ""
-  nvim_float.create_form({
-    title = " Filter ",
-    width = 50,
-    zindex = nvim_float.ZINDEX.MODAL,
-    fields = {
-      {
-        name = "value",
-        label = "Pattern:",
-        type = "text",
-        value = current,
-        placeholder = "Type to filter (empty to clear)...",
-        width = 30,
-      },
-    },
-    on_submit = function(values)
-      local value = values.value or ""
-      mp_state._favdir.active_filter = (value ~= "") and value or nil
-      mp_state:render_panel(constants.PANEL.ITEMS)
-    end,
-    -- on_cancel: keep existing filter unchanged
-  })
+  -- Focus the items panel first, then focus the embedded filter input
+  mp_state:focus_panel(constants.PANEL.ITEMS)
+  local items_panel = mp_state.panels[constants.PANEL.ITEMS]
+  if items_panel and items_panel.float then
+    items_panel.float:focus_container("filter")
+  end
 end
 
 return M
