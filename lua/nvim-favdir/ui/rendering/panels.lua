@@ -122,7 +122,8 @@ end
 
 ---Render right panel (items in selected group or directory contents for dir_link)
 ---@param mp_state MultiPanelState
----@return ContentBuilder cb
+---@return string[] lines
+---@return table[] highlights
 function M.render_right_panel(mp_state)
   local ui_state = data_module.load_ui_state()
   local ContentBuilder = require("nvim-float.content")
@@ -151,7 +152,8 @@ function M.render_right_panel(mp_state)
     set_panel_title(mp_state, constants.PANEL.ITEMS,
       " " .. dir_name .. sort_indicator(dir_mode, dir_asc) .. filter_str .. " ")
     directory.render_dir_link_contents(mp_state, cb, base_path, current_path)
-    return cb
+    mp_state:set_panel_content_builder(constants.PANEL.ITEMS, cb)
+    return cb:build_lines(), cb:build_highlights()
   end
 
   -- Check if a dir_link is selected
@@ -164,7 +166,8 @@ function M.render_right_panel(mp_state)
     set_panel_title(mp_state, constants.PANEL.ITEMS,
       " " .. dir_name .. sort_indicator(dir_mode, dir_asc) .. filter_str .. " ")
     directory.render_dir_link_contents(mp_state, cb, base_path, current_path)
-    return cb
+    mp_state:set_panel_content_builder(constants.PANEL.ITEMS, cb)
+    return cb:build_lines(), cb:build_highlights()
   end
 
   -- Otherwise, render group items (original behavior)
@@ -181,21 +184,21 @@ function M.render_right_panel(mp_state)
     set_panel_title(mp_state, constants.PANEL.ITEMS, " Items ")
     cb:muted("← Select a group to view items")
     mp_state:set_panel_content_builder(constants.PANEL.ITEMS, cb)
-    return cb
+    return cb:build_lines(), cb:build_highlights()
   end
 
   local group = groups_module.find_group(data, group_path)
   if not group then
     cb:muted("Group not found")
     mp_state:set_panel_content_builder(constants.PANEL.ITEMS, cb)
-    return cb
+    return cb:build_lines(), cb:build_highlights()
   end
 
   if #group.items == 0 then
     cb:muted("No items in this group.")
     cb:muted("Press 'a' to add current dir/file.")
     mp_state:set_panel_content_builder(constants.PANEL.ITEMS, cb)
-    return cb
+    return cb:build_lines(), cb:build_highlights()
   end
 
   -- Sort items based on right_sort_mode
@@ -224,7 +227,7 @@ function M.render_right_panel(mp_state)
       local group_display = group.display_name or group.name
       set_panel_title(mp_state, constants.PANEL.ITEMS,
         " " .. group_display .. sort_indicator(sort_mode, sort_asc) .. filter_str .. " ")
-      return cb
+      return cb:build_lines(), cb:build_highlights()
     end
     items = filtered
   end
@@ -305,7 +308,7 @@ function M.render_right_panel(mp_state)
   set_panel_title(mp_state, constants.PANEL.ITEMS,
     " " .. group_display .. sort_indicator(sort_mode, sort_asc) .. filter_str .. " ")
 
-  return cb
+  return cb:build_lines(), cb:build_highlights()
 end
 
 return M
