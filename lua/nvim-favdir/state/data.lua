@@ -24,6 +24,9 @@ local constants = require("nvim-favdir.constants")
 ---@class FavdirGroup
 ---@field name string Group name
 ---@field display_name string? Optional display name (nickname, UI-only)
+---@field icon string? Custom Nerd Font icon character
+---@field icon_color string? Custom icon hex color (e.g., "#FF5733")
+---@field name_color string? Custom group name hex color
 ---@field items FavdirItem[] Files and directories in this group
 ---@field order number Sort order
 ---@field children FavdirGroup[]? Child groups (for hierarchy)

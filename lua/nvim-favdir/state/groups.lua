@@ -335,4 +335,46 @@ function M.set_display_name(group_path, display_name)
   return true, nil
 end
 
+-- ============================================================================
+-- Custom Icon/Color Operations
+-- ============================================================================
+
+---Set or clear the custom icon for a group
+---@param group_path string Group path
+---@param icon string? Icon character (nil or empty to clear)
+---@return boolean success
+---@return string? error_message
+function M.set_group_icon(group_path, icon)
+  local data = data_module.load_data()
+  local group = M.find_group(data, group_path)
+
+  if not group then
+    return false, "Group not found"
+  end
+
+  group.icon = (icon and icon ~= "") and icon or nil
+  data_module.save_data(data)
+  return true, nil
+end
+
+---Set or clear custom colors for a group
+---@param group_path string Group path
+---@param icon_color string? Hex color for icon (nil to clear)
+---@param name_color string? Hex color for name (nil to clear)
+---@return boolean success
+---@return string? error_message
+function M.set_group_colors(group_path, icon_color, name_color)
+  local data = data_module.load_data()
+  local group = M.find_group(data, group_path)
+
+  if not group then
+    return false, "Group not found"
+  end
+
+  group.icon_color = (icon_color and icon_color ~= "") and icon_color or nil
+  group.name_color = (name_color and name_color ~= "") and name_color or nil
+  data_module.save_data(data)
+  return true, nil
+end
+
 return M

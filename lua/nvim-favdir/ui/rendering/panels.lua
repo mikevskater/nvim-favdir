@@ -66,18 +66,15 @@ function M.render_left_panel(mp_state)
 
   for _, node in ipairs(nodes) do
     local indent = string.rep("  ", node.level)
-    local icon
+    local group = node.group
 
-    if node.is_dir_link then
-      -- Directory link: use folder icon
-      icon = icons.get_base_icon("directory")
-    elseif node.has_children then
-      -- Group with children: use expand/collapse icon
-      icon = node.is_expanded and icons.get_base_icon("expanded") or icons.get_base_icon("collapsed")
-    else
-      -- Leaf group: use leaf icon
-      icon = icons.get_base_icon("leaf")
-    end
+    -- Get icon and color (respects custom icon/color on the group)
+    local icon, icon_color = icons.get_group_icon(
+      group,
+      node.is_expanded,
+      node.has_children,
+      node.is_dir_link
+    )
 
     -- Check if this is the selected item (group or dir_link)
     local is_selected = false
@@ -88,11 +85,22 @@ function M.render_left_panel(mp_state)
         or (ui_state.last_selected_type == nil and ui_state.last_selected_group == node.full_path)
     end
 
-    -- Build line with element tracking
+    -- Determine highlight groups for icon and name
+    local icon_hl = (not is_selected and icon_color) and icons.get_icon_hl(icon_color) or nil
+    local name_color = not node.is_dir_link and group and group.name_color or nil
+    local name_hl = (not is_selected and name_color) and icons.get_icon_hl(name_color) or nil
+
+    -- Build line with separate icon and name spans for custom coloring
     cb:spans({
       {
-        text = indent .. icon .. " " .. node.name,
+        text = indent .. icon .. " ",
         style = is_selected and "emphasis" or nil,
+        hl_group = (not is_selected) and icon_hl or nil,
+      },
+      {
+        text = node.name,
+        style = is_selected and "emphasis" or nil,
+        hl_group = (not is_selected) and name_hl or nil,
         track = {
           name = node.full_path,
           type = "action",
@@ -131,6 +139,7 @@ function M.render_right_panel(mp_state)
 
   -- Inline filter input at top of panel
   cb:embedded_input("filter", {
+    tab_stop = false,
     placeholder = "/ filter...",
     value = mp_state._favdir.active_filter or "",
     width = 25,

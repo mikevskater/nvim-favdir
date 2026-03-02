@@ -337,6 +337,30 @@ function M.get_file_color()
   return base_colors.file
 end
 
+---Get icon and color for a group, respecting custom icon/color settings
+---@param group FavdirGroup? The group object (may have icon, icon_color fields)
+---@param is_expanded boolean Whether the group is expanded
+---@param has_children boolean Whether the group has children
+---@param is_dir_link boolean Whether this is a directory link
+---@return string icon The icon character
+---@return string? color Hex color for the icon
+function M.get_group_icon(group, is_expanded, has_children, is_dir_link)
+  -- Custom icon takes priority
+  if group and group.icon and group.icon ~= "" then
+    return group.icon, group.icon_color
+  end
+
+  -- Default icons based on type
+  if is_dir_link then
+    return M.get_base_icon("directory"), base_colors.directory
+  elseif has_children then
+    local icon = is_expanded and M.get_base_icon("expanded") or M.get_base_icon("collapsed")
+    return icon, group and group.icon_color or nil
+  else
+    return M.get_base_icon("leaf"), group and group.icon_color or nil
+  end
+end
+
 ---Check if nvim-web-devicons is available
 ---@return boolean
 function M.has_devicons()

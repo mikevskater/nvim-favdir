@@ -225,8 +225,8 @@ function M.handle_rename(mp_state)
       return
     end
 
-    -- Group: offer display name or actual rename
-    local options = { "Set display name", "Rename group" }
+    -- Group: offer display name, icon, color, or actual rename
+    local options = { "Set display name", "Set icon", "Set color", "Rename group" }
     dialogs.select("Rename '" .. node.name .. "'", options, function(idx, choice)
       if not choice then return end
 
@@ -239,6 +239,73 @@ function M.handle_rename(mp_state)
             utils.refresh_panels(mp_state, constants.PANEL.GROUPS)
           else
             logger.error(err or "Failed to set display name")
+          end
+        end)
+      elseif choice == "Set icon" then
+        local default_icon = node.group and node.group.icon or ""
+        dialogs.input("Set Icon", "Icon (paste Nerd Font char):", default_icon, function(icon)
+          if icon == nil then return end
+          local ok, err = groups_module.set_group_icon(node.full_path, icon)
+          if ok then
+            utils.refresh_panels(mp_state, constants.PANEL.GROUPS)
+          else
+            logger.error(err or "Failed to set icon")
+          end
+        end)
+      elseif choice == "Set color" then
+        local color_options = {
+          "Red (#E06C75)",
+          "Green (#98C379)",
+          "Blue (#61AFEF)",
+          "Yellow (#E5C07B)",
+          "Purple (#C678DD)",
+          "Cyan (#56B6C2)",
+          "Orange (#D19A66)",
+          "Pink (#E06C95)",
+          "Custom hex...",
+          "Clear color",
+        }
+        dialogs.select("Set color for '" .. node.name .. "'", color_options, function(_, color_choice)
+          if not color_choice then return end
+
+          local color_map = {
+            ["Red (#E06C75)"] = "#E06C75",
+            ["Green (#98C379)"] = "#98C379",
+            ["Blue (#61AFEF)"] = "#61AFEF",
+            ["Yellow (#E5C07B)"] = "#E5C07B",
+            ["Purple (#C678DD)"] = "#C678DD",
+            ["Cyan (#56B6C2)"] = "#56B6C2",
+            ["Orange (#D19A66)"] = "#D19A66",
+            ["Pink (#E06C95)"] = "#E06C95",
+          }
+
+          if color_choice == "Clear color" then
+            local ok, err = groups_module.set_group_colors(node.full_path, nil, nil)
+            if ok then
+              utils.refresh_panels(mp_state, constants.PANEL.GROUPS)
+            else
+              logger.error(err or "Failed to clear color")
+            end
+          elseif color_choice == "Custom hex..." then
+            dialogs.input("Custom Color", "Hex color (e.g. #FF5733):", "#", function(hex)
+              if not hex or hex == "" or hex == "#" then return end
+              local ok, err = groups_module.set_group_colors(node.full_path, hex, hex)
+              if ok then
+                utils.refresh_panels(mp_state, constants.PANEL.GROUPS)
+              else
+                logger.error(err or "Failed to set color")
+              end
+            end)
+          else
+            local hex = color_map[color_choice]
+            if hex then
+              local ok, err = groups_module.set_group_colors(node.full_path, hex, hex)
+              if ok then
+                utils.refresh_panels(mp_state, constants.PANEL.GROUPS)
+              else
+                logger.error(err or "Failed to set color")
+              end
+            end
           end
         end)
       else
