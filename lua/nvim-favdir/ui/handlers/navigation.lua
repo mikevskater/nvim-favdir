@@ -292,6 +292,10 @@ end
 ---Handle filter (/ key) - focus the embedded filter input in the items panel
 ---@param mp_state MultiPanelState
 function M.handle_filter(mp_state)
+  -- Save current filter value for Esc revert
+  mp_state._favdir._filter_before_edit = mp_state._favdir.active_filter
+  mp_state._favdir._filter_committed = nil
+
   -- Focus the items panel first, then focus the embedded filter input
   mp_state:focus_panel(constants.PANEL.ITEMS)
   local items_panel = mp_state.panels[constants.PANEL.ITEMS]

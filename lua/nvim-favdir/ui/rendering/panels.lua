@@ -140,11 +140,31 @@ function M.render_right_panel(mp_state)
   -- Inline filter input at top of panel
   cb:embedded_input("filter", {
     tab_stop = false,
+    col = 0,
     placeholder = "/ filter...",
     value = mp_state._favdir.active_filter or "",
-    width = 25,
-    on_submit = function(_, v)
+    on_change = function(_, v)
+      -- Live filter as user types
       mp_state._favdir.active_filter = (v ~= "") and v or nil
+      mp_state:render_panel(constants.PANEL.ITEMS)
+    end,
+    on_submit = function(_, v)
+      -- Enter: commit filter, deactivate
+      mp_state._favdir.active_filter = (v ~= "") and v or nil
+      mp_state._favdir._filter_committed = true
+      local items_panel = mp_state.panels[constants.PANEL.ITEMS]
+      if items_panel and items_panel.float and items_panel.float._virtual_manager then
+        items_panel.float._virtual_manager:deactivate()
+      end
+    end,
+    on_deactivate = function(_, _)
+      -- Esc: revert to pre-edit value if not committed
+      if not mp_state._favdir._filter_committed
+         and mp_state._favdir._filter_before_edit ~= nil then
+        mp_state._favdir.active_filter = mp_state._favdir._filter_before_edit
+      end
+      mp_state._favdir._filter_before_edit = nil
+      mp_state._favdir._filter_committed = nil
       mp_state:render_panel(constants.PANEL.ITEMS)
     end,
   })
