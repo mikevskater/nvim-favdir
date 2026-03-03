@@ -262,7 +262,7 @@ function M.handle_rename(mp_state)
           "Cyan (#56B6C2)",
           "Orange (#D19A66)",
           "Pink (#E06C95)",
-          "Custom hex...",
+          "Color picker...",
           "Clear color",
         }
         dialogs.select("Set color for '" .. node.name .. "'", color_options, function(_, color_choice)
@@ -286,16 +286,26 @@ function M.handle_rename(mp_state)
             else
               logger.error(err or "Failed to clear color")
             end
-          elseif color_choice == "Custom hex..." then
-            dialogs.input("Custom Color", "Hex color (e.g. #FF5733):", "#", function(hex)
-              if not hex or hex == "" or hex == "#" then return end
-              local ok, err = groups_module.set_group_colors(node.full_path, hex, hex)
-              if ok then
-                utils.refresh_panels(mp_state, constants.PANEL.GROUPS)
-              else
-                logger.error(err or "Failed to set color")
-              end
-            end)
+          elseif color_choice == "Color picker..." then
+            local cp_ok, colorpicker = pcall(require, "nvim-colorpicker")
+            if not cp_ok then
+              logger.error("nvim-colorpicker not installed")
+              return
+            end
+            local initial = (node.group and node.group.icon_color) or "#808080"
+            colorpicker.pick({
+              color = initial,
+              title = "Group Color: " .. node.name,
+              on_select = function(result)
+                local hex = result.color
+                local ok, err = groups_module.set_group_colors(node.full_path, hex, hex)
+                if ok then
+                  utils.refresh_panels(mp_state, constants.PANEL.GROUPS)
+                else
+                  logger.error(err or "Failed to set color")
+                end
+              end,
+            })
           else
             local hex = color_map[color_choice]
             if hex then
